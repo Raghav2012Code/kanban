@@ -171,7 +171,8 @@ function moveCard(state: BoardState, cardId: string, targetColumnId: string, tar
 
 function PriorityBadge({ priority }: { priority: Priority }): JSX.Element {
   const style = priorityStyles[priority];
-  return <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${style.badge}`}><span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />{style.label}</span>;
+  return <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${style.badge}`}>
+<span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />{style.label}</span>;
 }
 
 function CardForm({ initial, onSave, onCancel }: { initial?: Draft; onSave: (draft: Draft) => void; onCancel: () => void }): JSX.Element {
@@ -185,11 +186,18 @@ function CardForm({ initial, onSave, onCancel }: { initial?: Draft; onSave: (dra
   return <form onSubmit={submit} className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3" onKeyDown={(event: KeyboardEvent<HTMLFormElement>) => { if (event.key === 'Escape') onCancel(); }}>
     <input ref={titleRef} value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="Card title" aria-label="Card title" className="w-full rounded border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-50 outline-none transition placeholder:text-zinc-600 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500" />
     <div className="grid grid-cols-2 gap-2">
-      <select value={draft.priority} onChange={(event) => setDraft((current) => ({ ...current, priority: event.target.value as Priority }))} aria-label="Priority" className="rounded border border-zinc-800 bg-zinc-900 px-2 py-2 text-xs text-zinc-300 outline-none focus:border-zinc-500"><option value="low">Low priority</option><option value="medium">Medium priority</option><option value="high">High priority</option></select>
+      <select value={draft.priority} onChange={(event) => setDraft((current) => ({ ...current, priority: event.target.value as Priority }))} aria-label="Priority" className="rounded border border-zinc-800 bg-zinc-900 px-2 py-2 text-xs text-zinc-300 outline-none focus:border-zinc-500">
+<option value="low">Low priority</option>
+<option value="medium">Medium priority</option>
+<option value="high">High priority</option>
+</select>
       <input type="date" value={draft.dueDate} onChange={(event) => setDraft((current) => ({ ...current, dueDate: event.target.value }))} aria-label="Due date" className="min-w-0 rounded border border-zinc-800 bg-zinc-900 px-2 py-2 text-xs text-zinc-300 outline-none focus:border-zinc-500" />
     </div>
     <textarea value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="Description (optional)" aria-label="Description" rows={3} className="w-full resize-none rounded border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-300 outline-none placeholder:text-zinc-600 focus:border-zinc-500" />
-    <div className="flex justify-end gap-2"><button type="button" onClick={onCancel} className="rounded px-2.5 py-1.5 text-xs text-zinc-500 transition hover:bg-zinc-900 hover:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-500">Cancel</button><button type="submit" className="rounded bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-950 transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-400">Save card</button></div>
+    <div className="flex justify-end gap-2">
+<button type="button" onClick={onCancel} className="rounded px-2.5 py-1.5 text-xs text-zinc-500 transition hover:bg-zinc-900 hover:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-500">Cancel</button>
+<button type="submit" className="rounded bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-950 transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-400">Save card</button>
+</div>
   </form>;
 }
 
@@ -197,7 +205,19 @@ function KanbanCard({ card, done, visibleCardIds, onDelete, onToggleExpanded, ex
   const today = localDateString();
   const overdue = isOverdue(card, today);
   return <div draggable onDragStart={(event) => onDragStart(event, card.id)} onDragEnd={onDragEnd} onDragOver={(event) => onDragOver(event, card.id)} onDrop={(event) => onDrop(event, card.id)} className="group relative rounded-lg border border-zinc-800 bg-zinc-900/80 p-3 transition hover:border-zinc-700 focus-within:border-zinc-600">
-    <div className="flex items-start gap-2"><GripVertical aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 cursor-grab text-zinc-700 transition group-hover:text-zinc-500" /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><h3 className={`text-sm font-medium leading-5 ${done ? 'text-zinc-600 line-through' : 'text-zinc-100'}`}>{card.title}</h3><button type="button" onClick={() => onDelete(card.id)} aria-label={`Delete ${card.title}`} className="-mr-1 -mt-1 rounded p-1 text-zinc-600 opacity-0 transition hover:bg-zinc-800 hover:text-rose-400 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-zinc-500 group-hover:opacity-100"><Trash2 className="h-3.5 w-3.5" /></button></div><div className="mt-2 flex flex-wrap items-center gap-2"><PriorityBadge priority={card.priority} />{card.dueDate && <span className={`text-[10px] ${overdue ? 'text-rose-400' : 'text-zinc-500'}`}>{overdue && <span className="mr-1" aria-label="Overdue">⚠️</span>}{card.dueDate}</span>}</div>{card.description && <><button type="button" onClick={() => onToggleExpanded(card.id)} aria-expanded={expanded} className="mt-3 flex items-center gap-1 text-[11px] text-zinc-500 transition hover:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-600">{expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />} {expanded ? 'Hide details' : 'Show details'}</button>{expanded && <p className="mt-2 text-xs leading-5 text-zinc-500">{card.description}</p>}</>}</div></div>
+    <div className="flex items-start gap-2">
+<GripVertical aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 cursor-grab text-zinc-700 transition group-hover:text-zinc-500" />
+<div className="min-w-0 flex-1">
+<div className="flex items-start justify-between gap-2">
+<h3 className={`text-sm font-medium leading-5 ${done ? 'text-zinc-600 line-through' : 'text-zinc-100'}`}>{card.title}</h3>
+<button type="button" onClick={() => onDelete(card.id)} aria-label={`Delete ${card.title}`} className="-mr-1 -mt-1 rounded p-1 text-zinc-600 opacity-0 transition hover:bg-zinc-800 hover:text-rose-400 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-zinc-500 group-hover:opacity-100">
+<Trash2 className="h-3.5 w-3.5" />
+</button>
+</div>
+<div className="mt-2 flex flex-wrap items-center gap-2">
+<PriorityBadge priority={card.priority} />{card.dueDate && <span className={`text-[10px] ${overdue ? 'text-rose-400' : 'text-zinc-500'}`}>{overdue && <span className="mr-1" aria-label="Overdue">⚠️</span>}{card.dueDate}</span>}</div>{card.description && <>
+<button type="button" onClick={() => onToggleExpanded(card.id)} aria-expanded={expanded} className="mt-3 flex items-center gap-1 text-[11px] text-zinc-500 transition hover:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-600">{expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />} {expanded ? 'Hide details' : 'Show details'}</button>{expanded && <p className="mt-2 text-xs leading-5 text-zinc-500">{card.description}</p>}</>}</div>
+</div>
     {visibleCardIds.includes(card.id) && <span className="sr-only">Draggable card</span>}
   </div>;
 }
@@ -249,8 +269,68 @@ export default function KanbanBoard(): JSX.Element {
   const handleDrop = (event: DragEvent<HTMLDivElement>, columnId: string, cardId?: string) => { event.preventDefault(); const id = event.dataTransfer.getData('text/plain'); if (id && board.cards[id]) updateBoard((current) => moveCard(current, id, columnId, cardId)); clearDrag(); };
 
   return <div className="min-h-screen bg-black pb-16 text-zinc-50 selection:bg-zinc-700/60">
-    <header className="border-b border-zinc-800 bg-[#09090b] px-4 py-5 sm:px-6 lg:px-10"><div className="mx-auto flex max-w-[1600px] flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"><div><div className="mb-2 flex items-center gap-2 text-zinc-500"><LayoutPanelTop className="h-4 w-4" /><span className="text-[10px] font-semibold uppercase tracking-[0.25em]">Personal workspace</span></div><h1 className="text-2xl font-semibold tracking-tight text-zinc-50 sm:text-3xl">Noir Board</h1><p className="mt-1 text-sm text-zinc-500">A quiet system for moving important work forward.</p></div><div className="flex flex-col gap-2 sm:flex-row"><label className="relative"><Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-zinc-600" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search cards" aria-label="Search cards" className="w-full rounded-md border border-zinc-800 bg-zinc-950 py-2 pl-9 pr-3 text-sm text-zinc-200 outline-none transition placeholder:text-zinc-600 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 sm:w-56" /></label><select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as PriorityFilter)} aria-label="Filter by priority" className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-400 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"><option value="all">All priorities</option><option value="low">Low priority</option><option value="medium">Medium priority</option><option value="high">High priority</option></select></div></div></header>
-    <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-10"><div className="flex min-w-max items-start gap-4 overflow-x-auto pb-5" onDragLeave={handleDragLeave}>{board.columns.map((column) => <section key={column.id} className="w-[290px] shrink-0 rounded-xl border border-zinc-800 bg-[#09090b] p-3 sm:w-[320px]" onDragOver={(event) => handleDragOver(event, column.id)} onDragEnter={(event) => handleDragOver(event, column.id)} onDragLeave={handleDragLeave} onDrop={(event) => handleDrop(event, column.id)} aria-label={`${column.title} column`}><div className="mb-3 flex items-center gap-2 px-1"><Archive className="h-4 w-4 text-zinc-600" />{renamingColumn === column.id ? <input ref={renameRef} value={renameValue} onChange={(event) => setRenameValue(event.target.value)} onBlur={saveRename} onKeyDown={(event) => { if (event.key === 'Enter') saveRename(); if (event.key === 'Escape') setRenamingColumn(null); }} aria-label="Rename column" className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 outline-none" /> : <button type="button" onDoubleClick={() => beginRename(column)} className="flex-1 text-left text-sm font-semibold text-zinc-200 focus:outline-none focus:ring-2 focus:ring-zinc-600" title="Double-click to rename">{column.title}</button>}<span className="rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] text-zinc-600">{column.cardIds.length}</span><button type="button" onClick={() => column.cardIds.length === 0 && updateBoard((current) => ({ ...current, columns: current.columns.filter((item) => item.id !== column.id) }))} disabled={column.cardIds.length > 0} aria-label={`Delete ${column.title} column`} title={column.cardIds.length > 0 ? 'Only empty columns can be deleted' : 'Delete column'} className="rounded p-1 text-zinc-700 transition hover:bg-zinc-900 hover:text-rose-400 focus:outline-none focus:ring-2 focus:ring-zinc-600 disabled:cursor-not-allowed disabled:opacity-30"><Trash2 className="h-3.5 w-3.5" /></button></div><div className="space-y-2" onDragLeave={handleDragLeave}>{visibleByColumn[column.id].map((cardId) => { const card = board.cards[cardId]; return card ? <KanbanCard key={card.id} card={card} done={column.title.toLowerCase() === 'done'} visibleCardIds={visibleByColumn[column.id]} expanded={expanded.has(card.id)} onToggleExpanded={(id) => setExpanded((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })} onDelete={deleteCard} onDragStart={handleDragStart} onDragEnd={clearDrag} onDragOver={(event, id) => handleDragOver(event, column.id, id)} onDrop={(event, id) => handleDrop(event, column.id, id)} /> : null; })}{draggedCardId && dropTarget?.columnId === column.id && <div className="h-8 rounded-lg border border-dashed border-zinc-600 bg-zinc-900/40" aria-hidden="true" />}</div>{activeFormColumn === column.id ? <div className="mt-3"><CardForm onSave={(draft) => addCard(column.id, draft)} onCancel={() => setActiveFormColumn(null)} /></div> : <button type="button" onClick={() => { setActiveFormColumn(column.id); setAddingColumn(false); }} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-zinc-800 py-2 text-xs text-zinc-600 transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-600"><Plus className="h-3.5 w-3.5" /> Add card</button>}</section>)}{addingColumn ? <div className="w-[290px] shrink-0 rounded-xl border border-zinc-800 bg-[#09090b] p-3 sm:w-[320px]"><div className="flex gap-2"><input ref={newColumnRef} value={newColumnTitle} onChange={(event) => setNewColumnTitle(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') saveColumn(); if (event.key === 'Escape') { setAddingColumn(false); setNewColumnTitle(''); } }} placeholder="Column name" aria-label="New column name" className="min-w-0 flex-1 rounded border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-500" /><button type="button" onClick={saveColumn} aria-label="Save column" className="rounded bg-zinc-100 px-2 text-zinc-950 hover:bg-white"><Check className="h-4 w-4" /></button><button type="button" onClick={() => { setAddingColumn(false); setNewColumnTitle(''); }} aria-label="Cancel adding column" className="rounded border border-zinc-800 px-2 text-zinc-500 hover:text-zinc-200"><X className="h-4 w-4" /></button></div></div> : <button type="button" onClick={() => { setAddingColumn(true); setActiveFormColumn(null); }} className="flex h-12 w-[290px] shrink-0 items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-800 text-xs text-zinc-600 transition hover:border-zinc-700 hover:bg-zinc-950 hover:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-600 sm:w-[320px]"><CirclePlus className="h-4 w-4" /> Add column</button>}</div></main>
-    <footer className="fixed inset-x-0 bottom-0 z-10 border-t border-zinc-800 bg-[#09090b] px-4 py-3 sm:px-6 lg:px-10"><div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 overflow-x-auto text-[10px] font-medium uppercase tracking-wider text-zinc-500"><div className="flex min-w-max items-center gap-5"><span><strong className="text-zinc-200">{analytics.total}</strong> Total cards</span><span><strong className="text-rose-400">{analytics.overdue}</strong> Overdue</span><span><strong className="text-emerald-400">{analytics.done}</strong> Done</span></div><span className="flex min-w-max items-center gap-2"><ClipboardList className="h-3.5 w-3.5" /><strong className="text-zinc-200">{analytics.completion}%</strong> complete</span></div></footer>
+    <header className="border-b border-zinc-800 bg-[#09090b] px-4 py-5 sm:px-6 lg:px-10">
+<div className="mx-auto flex max-w-[1600px] flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+<div>
+<div className="mb-2 flex items-center gap-2 text-zinc-500">
+<LayoutPanelTop className="h-4 w-4" />
+<span className="text-[10px] font-semibold uppercase tracking-[0.25em]">Personal workspace</span>
+</div>
+<h1 className="text-2xl font-semibold tracking-tight text-zinc-50 sm:text-3xl">Noir Board</h1>
+<p className="mt-1 text-sm text-zinc-500">A quiet system for moving important work forward.</p>
+</div>
+<div className="flex flex-col gap-2 sm:flex-row">
+<label className="relative">
+<Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-zinc-600" />
+<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search cards" aria-label="Search cards" className="w-full rounded-md border border-zinc-800 bg-zinc-950 py-2 pl-9 pr-3 text-sm text-zinc-200 outline-none transition placeholder:text-zinc-600 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 sm:w-56" />
+</label>
+<select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as PriorityFilter)} aria-label="Filter by priority" className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-400 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500">
+<option value="all">All priorities</option>
+<option value="low">Low priority</option>
+<option value="medium">Medium priority</option>
+<option value="high">High priority</option>
+</select>
+</div>
+</div>
+</header>
+    <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-10">
+<div className="flex min-w-max items-start gap-4 overflow-x-auto pb-5" onDragLeave={handleDragLeave}>{board.columns.map((column) => <section key={column.id} className="w-[290px] shrink-0 rounded-xl border border-zinc-800 bg-[#09090b] p-3 sm:w-[320px]" onDragOver={(event) => handleDragOver(event, column.id)} onDragEnter={(event) => handleDragOver(event, column.id)} onDragLeave={handleDragLeave} onDrop={(event) => handleDrop(event, column.id)} aria-label={`${column.title} column`}>
+<div className="mb-3 flex items-center gap-2 px-1">
+<Archive className="h-4 w-4 text-zinc-600" />{renamingColumn === column.id ? <input ref={renameRef} value={renameValue} onChange={(event) => setRenameValue(event.target.value)} onBlur={saveRename} onKeyDown={(event) => { if (event.key === 'Enter') saveRename(); if (event.key === 'Escape') setRenamingColumn(null); }} aria-label="Rename column" className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 outline-none" /> : <button type="button" onDoubleClick={() => beginRename(column)} className="flex-1 text-left text-sm font-semibold text-zinc-200 focus:outline-none focus:ring-2 focus:ring-zinc-600" title="Double-click to rename">{column.title}</button>}<span className="rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] text-zinc-600">{column.cardIds.length}</span>
+<button type="button" onClick={() => column.cardIds.length === 0 && updateBoard((current) => ({ ...current, columns: current.columns.filter((item) => item.id !== column.id) }))} disabled={column.cardIds.length > 0} aria-label={`Delete ${column.title} column`} title={column.cardIds.length > 0 ? 'Only empty columns can be deleted' : 'Delete column'} className="rounded p-1 text-zinc-700 transition hover:bg-zinc-900 hover:text-rose-400 focus:outline-none focus:ring-2 focus:ring-zinc-600 disabled:cursor-not-allowed disabled:opacity-30">
+<Trash2 className="h-3.5 w-3.5" />
+</button>
+</div>
+<div className="space-y-2" onDragLeave={handleDragLeave}>{visibleByColumn[column.id].map((cardId) => { const card = board.cards[cardId]; return card ? <KanbanCard key={card.id} card={card} done={column.title.toLowerCase() === 'done'} visibleCardIds={visibleByColumn[column.id]} expanded={expanded.has(card.id)} onToggleExpanded={(id) => setExpanded((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })} onDelete={deleteCard} onDragStart={handleDragStart} onDragEnd={clearDrag} onDragOver={(event, id) => handleDragOver(event, column.id, id)} onDrop={(event, id) => handleDrop(event, column.id, id)} /> : null; })}{draggedCardId && dropTarget?.columnId === column.id && <div className="h-8 rounded-lg border border-dashed border-zinc-600 bg-zinc-900/40" aria-hidden="true" />}</div>{activeFormColumn === column.id ? <div className="mt-3">
+<CardForm onSave={(draft) => addCard(column.id, draft)} onCancel={() => setActiveFormColumn(null)} />
+</div> : <button type="button" onClick={() => { setActiveFormColumn(column.id); setAddingColumn(false); }} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-zinc-800 py-2 text-xs text-zinc-600 transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-600">
+<Plus className="h-3.5 w-3.5" /> Add card</button>}</section>)}{addingColumn ? <div className="w-[290px] shrink-0 rounded-xl border border-zinc-800 bg-[#09090b] p-3 sm:w-[320px]">
+<div className="flex gap-2">
+<input ref={newColumnRef} value={newColumnTitle} onChange={(event) => setNewColumnTitle(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') saveColumn(); if (event.key === 'Escape') { setAddingColumn(false); setNewColumnTitle(''); } }} placeholder="Column name" aria-label="New column name" className="min-w-0 flex-1 rounded border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-500" />
+<button type="button" onClick={saveColumn} aria-label="Save column" className="rounded bg-zinc-100 px-2 text-zinc-950 hover:bg-white">
+<Check className="h-4 w-4" />
+</button>
+<button type="button" onClick={() => { setAddingColumn(false); setNewColumnTitle(''); }} aria-label="Cancel adding column" className="rounded border border-zinc-800 px-2 text-zinc-500 hover:text-zinc-200">
+<X className="h-4 w-4" />
+</button>
+</div>
+</div> : <button type="button" onClick={() => { setAddingColumn(true); setActiveFormColumn(null); }} className="flex h-12 w-[290px] shrink-0 items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-800 text-xs text-zinc-600 transition hover:border-zinc-700 hover:bg-zinc-950 hover:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-600 sm:w-[320px]">
+<CirclePlus className="h-4 w-4" /> Add column</button>}</div>
+</main>
+    <footer className="fixed inset-x-0 bottom-0 z-10 border-t border-zinc-800 bg-[#09090b] px-4 py-3 sm:px-6 lg:px-10">
+<div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 overflow-x-auto text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+<div className="flex min-w-max items-center gap-5">
+<span>
+<strong className="text-zinc-200">{analytics.total}</strong> Total cards</span>
+<span>
+<strong className="text-rose-400">{analytics.overdue}</strong> Overdue</span>
+<span>
+<strong className="text-emerald-400">{analytics.done}</strong> Done</span>
+</div>
+<span className="flex min-w-max items-center gap-2">
+<ClipboardList className="h-3.5 w-3.5" />
+<strong className="text-zinc-200">{analytics.completion}%</strong> complete</span>
+</div>
+</footer>
   </div>;
 }
