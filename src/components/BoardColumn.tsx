@@ -24,12 +24,12 @@ interface BoardColumnProps {
   onDeleteCard: (id: string) => void;
   expandedIds: Set<string>;
   onToggleExpanded: (id: string) => void;
-  onDragStart: (event: DragEvent<HTMLDivElement>, id: string) => void;
+  onDragStart: (event: DragEvent<HTMLElement>, id: string) => void;
   onDragEnd: () => void;
-  onDragOver: (event: DragEvent<HTMLDivElement>, cardId?: string) => void;
-  onDragEnter: (event: DragEvent<HTMLDivElement>, cardId?: string) => void;
-  onDragLeave: (event: DragEvent<HTMLDivElement>) => void;
-  onDrop: (event: DragEvent<HTMLDivElement>, cardId?: string) => void;
+  onDragOver: (event: DragEvent<HTMLElement>, cardId?: string) => void;
+  onDragEnter: (event: DragEvent<HTMLElement>, cardId?: string) => void;
+  onDragLeave: (event: DragEvent<HTMLElement>) => void;
+  onDrop: (event: DragEvent<HTMLElement>, cardId?: string) => void;
 }
 
 export function BoardColumn({ column, cards, activeForm, renaming, renameValue, draggedCardId, dropTarget, onStartCardForm, onSaveCard, onCancelCardForm, onBeginRename, onRenameChange, onSaveRename, onCancelRename, onDeleteColumn, onDeleteCard, expandedIds, onToggleExpanded, onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop }: BoardColumnProps): JSX.Element {

@@ -10,12 +10,12 @@ interface KanbanCardProps {
   expanded: boolean;
   onDelete: (id: string) => void;
   onToggleExpanded: (id: string) => void;
-  onDragStart: (event: DragEvent<HTMLDivElement>, id: string) => void;
+  onDragStart: (event: DragEvent<HTMLElement>, id: string) => void;
   onDragEnd: () => void;
-  onDragOver: (event: DragEvent<HTMLDivElement>, id: string) => void;
-  onDragEnter: (event: DragEvent<HTMLDivElement>, id: string) => void;
-  onDragLeave: (event: DragEvent<HTMLDivElement>) => void;
-  onDrop: (event: DragEvent<HTMLDivElement>, id: string) => void;
+  onDragOver: (event: DragEvent<HTMLElement>, id: string) => void;
+  onDragEnter: (event: DragEvent<HTMLElement>, id: string) => void;
+  onDragLeave: (event: DragEvent<HTMLElement>) => void;
+  onDrop: (event: DragEvent<HTMLElement>, id: string) => void;
 }
 
 export function KanbanCard({ card, done, expanded, onDelete, onToggleExpanded, onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop }: KanbanCardProps): JSX.Element {
