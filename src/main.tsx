@@ -1,3 +1,4 @@
+import { MotionConfig } from 'motion/react';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import KanbanBoard from './KanbanBoard';
@@ -11,6 +12,8 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <KanbanBoard />
+    <MotionConfig reducedMotion="user">
+      <KanbanBoard />
+    </MotionConfig>
   </StrictMode>,
 );
