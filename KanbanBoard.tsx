@@ -136,7 +136,6 @@ function loadBoardState(): BoardState {
       if (isValidBoard(parsed)) return parsed;
     }
   } catch {
-    // Storage may be unavailable or contain invalid JSON.
   }
   return createSeedState();
 }
@@ -218,7 +217,7 @@ export default function KanbanBoard(): JSX.Element {
   const newColumnRef = useRef<HTMLInputElement>(null);
   const renameRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(board)); } catch { /* Ignore unavailable storage. */ } }, [board]);
+  useEffect(() => { try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(board)); } catch { } }, [board]);
   useEffect(() => { if (addingColumn) newColumnRef.current?.focus(); }, [addingColumn]);
   useEffect(() => { if (renamingColumn) { renameRef.current?.focus(); renameRef.current?.select(); } }, [renamingColumn]);
 
