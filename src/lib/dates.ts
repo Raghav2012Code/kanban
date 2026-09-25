@@ -17,3 +17,11 @@ export function isValidDateString(value: unknown): value is string {
 export function isOverdue(card: CardItem, today = localDateString()): boolean {
   return Boolean(card.dueDate && card.dueDate < today);
 }
+
+export function isCardOverdue(card: CardItem, done: boolean, today = localDateString()): boolean {
+  return Boolean(card.dueDate && card.dueDate < today && !done);
+}
+
+export function addDays(date: Date, days: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+}
