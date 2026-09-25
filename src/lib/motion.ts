@@ -1,4 +1,4 @@
-import type { Transition, Variants } from 'motion/react';
+import type { Transition } from 'motion/react';
 
 export const motionTransition: Transition = {
   type: 'spring',
@@ -9,16 +9,4 @@ export const motionTransition: Transition = {
 
 export const reducedMotionTransition: Transition = {
   duration: 0,
-};
-
-export const columnVariants: Variants = {
-  hidden: { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: 8 },
-};
-
-export const formVariants: Variants = {
-  hidden: { opacity: 0, height: 0, y: -8 },
-  visible: { opacity: 1, height: 'auto', y: 0 },
-  exit: { opacity: 0, height: 0, y: -8 },
 };

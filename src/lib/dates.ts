@@ -14,10 +14,6 @@ export function isValidDateString(value: unknown): value is string {
   return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 }
 
-export function isOverdue(card: CardItem, today = localDateString()): boolean {
-  return Boolean(card.dueDate && card.dueDate < today);
-}
-
 export function isCardOverdue(card: CardItem, done: boolean, today = localDateString()): boolean {
   return Boolean(card.dueDate && card.dueDate < today && !done);
 }
