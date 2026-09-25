@@ -45,6 +45,13 @@ describe('KanbanCard overdue state', () => {
   });
 });
 
+describe('KanbanCard priority', () => {
+  it('exposes priority as a labelled meter', () => {
+    renderCard();
+    expect(screen.getByRole('img', { name: 'Priority: high' })).toBeInTheDocument();
+  });
+});
+
 describe('KanbanCard controls', () => {
   it('keeps delete reachable without hover', async () => {
     const user = userEvent.setup();

@@ -21,3 +21,18 @@ export function isCardOverdue(card: CardItem, done: boolean, today = localDateSt
 export function addDays(date: Date, days: number): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 }
+
+function dayNumber(value: string): number {
+  const [year, month, day] = value.split('-').map(Number);
+  return Date.UTC(year, month - 1, day) / 86_400_000;
+}
+
+export function formatDueDate(value: string, today = localDateString()): string {
+  if (!isValidDateString(value) || !isValidDateString(today)) return value;
+  const difference = dayNumber(value) - dayNumber(today);
+  if (difference === 0) return 'TODAY';
+  if (difference === 1) return 'TMRW';
+  if (difference > 1) return `+${difference}D`;
+  if (difference === -1) return '1D LATE';
+  return `${Math.abs(difference)}D LATE`;
+}

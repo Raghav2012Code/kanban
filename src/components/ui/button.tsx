@@ -2,13 +2,13 @@ import type { ButtonHTMLAttributes } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
-const buttonVariants = cva('inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 disabled:pointer-events-none disabled:opacity-50', {
+const buttonVariants = cva('inline-flex items-center justify-center gap-1.5 rounded-strip font-body text-sm font-medium transition-[background-color,border-color,color,transform] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40', {
   variants: {
     variant: {
-      default: 'bg-zinc-100 text-zinc-950 hover:bg-white',
-      ghost: 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100',
-      outline: 'border border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100',
-      destructive: 'text-zinc-600 hover:bg-zinc-900 hover:text-rose-400',
+      default: 'bg-accent text-accent-fg hover:bg-accent/90',
+      ghost: 'text-muted hover:bg-raised hover:text-ink',
+      outline: 'border border-line-strong text-muted hover:border-accent hover:text-ink',
+      destructive: 'text-faint hover:bg-raised hover:text-hold',
     },
     size: {
       default: 'px-3 py-2',

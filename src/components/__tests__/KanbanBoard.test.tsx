@@ -50,6 +50,17 @@ describe('KanbanBoard column deletion', () => {
   });
 });
 
+describe('KanbanBoard empty bays', () => {
+  it('teaches the first action when a bay has no strips', async () => {
+    const board = createSeedState(new Date(2026, 8, 25));
+    board.columns.push({ id: 'column-empty', title: 'Archive', cardIds: [] });
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
+    render(<KanbanBoard />);
+    const empty = await screen.findByLabelText('Archive column');
+    expect(within(empty).getByText(/No strips in this bay/i)).toBeInTheDocument();
+  });
+});
+
 describe('KanbanBoard card deletion', () => {
   it('removes an expanded card and its details', async () => {
     const user = userEvent.setup();

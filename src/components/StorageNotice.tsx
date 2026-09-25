@@ -1,4 +1,4 @@
-import { AlertTriangle, X } from 'lucide-react';
+import { IconAlertTriangle, IconX } from '@tabler/icons-react';
 import type { StorageWarning } from '@/hooks/useKanbanBoard';
 import { Button } from '@/components/ui/button';
 
@@ -16,5 +16,5 @@ interface StorageNoticeProps {
 
 export function StorageNotice({ warning, onDismiss }: StorageNoticeProps): JSX.Element | null {
   if (!warning) return null;
-  return <div role="status" aria-live="polite" className="mb-4 flex items-start gap-3 rounded-lg border border-amber-900/80 bg-amber-950/40 px-3 py-2 text-xs text-amber-300"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /><p className="min-w-0 flex-1">{messages[warning.kind]}</p><Button variant="ghost" size="icon" onClick={onDismiss} aria-label="Dismiss storage warning" className="h-5 w-5 text-amber-300"><X className="h-3 w-3" /></Button></div>;
+  return <div role="status" aria-live="polite" className="mb-4 flex items-start gap-3 rounded-strip border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-warn"><IconAlertTriangle size={14} stroke={1.5} aria-hidden="true" className="mt-0.5 shrink-0" /><p className="min-w-0 flex-1 leading-5">{messages[warning.kind]}</p><Button variant="ghost" size="icon" onClick={onDismiss} aria-label="Dismiss storage warning" className="h-5 w-5 text-warn hover:bg-warn/15 hover:text-warn"><IconX size={12} stroke={1.5} /></Button></div>;
 }
