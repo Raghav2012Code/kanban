@@ -5,8 +5,8 @@
 :root {
   color-scheme: dark;
 
-  --font-display: "B612", ui-sans-serif, system-ui, sans-serif;
-  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Barlow Semi Condensed", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Archivo", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "B612 Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --color-bg: #000000;
@@ -52,12 +52,10 @@
 }
 
 html {
-  min-width: 320px;
   background: var(--color-bg);
 }
 
 body {
-  min-width: 320px;
   min-height: 100vh;
   margin: 0;
   background: var(--color-bg);

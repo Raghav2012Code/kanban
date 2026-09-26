@@ -27,9 +27,11 @@
 
 ## Typography
 
-- Display: B612 (Airbus cockpit-legibility typeface) | source: Google Fonts | license: OFL
-- Body: IBM Plex Sans | source: Google Fonts | license: OFL
-- Mono: B612 Mono (figures, dates, counts, tail numbers, labels) | source: Google Fonts | license: OFL
+- Display: **Barlow Semi Condensed** | source: Google Fonts | license: OFL
+- Body: **Archivo** | source: Google Fonts | license: OFL
+- Mono: **B612 Mono** (figures, dates, counts, tail numbers, labels) | source: Google Fonts | license: OFL
+- The pairing works on **width**, not just role: Barlow Semi Condensed is a semi-condensed transport/signage grotesk, so the display face is visibly narrower than the body face. That is a real axis of contrast, and it is the most on-concept display face available for an instrument panel. Archivo is a sturdy, low-contrast grotesque that stays technical at 14px without going cold. B612 Mono was kept deliberately — it has genuine aviation DNA, is the strongest of the three at 11px, and pairs naturally with both.
+- Only the weights actually used are requested: display 700, body 400 and 500, mono 400 and 700 — five files. The previous request pulled eight, including a B612 italic that no rule ever used and a Plex 600 that no rule ever used. B612 itself was dropped entirely once it lost the display role, since `--font-mono` is a separate family.
 - Scale: ratio 1.2 minor third (dense tool), base 16px, 6 steps:
   | step | size | line-height | use |
   |------|------|-------------|-----|
@@ -133,8 +135,8 @@
 
 ```css
 :root {
-  --font-display: "B612", ui-sans-serif, system-ui, sans-serif;
-  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Barlow Semi Condensed", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Archivo", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "B612 Mono", ui-monospace, monospace;
   --color-bg: oklch(0 0 0);
   --color-surface: oklch(0.19 0.003 250);
@@ -181,6 +183,7 @@
 
 - 2026-09-26: bays became bounded panels (one border + surface fill) on a gap; strips stay ruled rows inside them; drop placeholders are dashed rows at strip height; added an accessible `Done` marker; added component-level regression tests for Done identity, filtered-move safety, and reduced-motion wiring.
 - 2026-09-26: redrew the brand mark and favicon. The previous mark used the rejected zinc palette, had a tile that vanished against dark chrome, and at 16px its three 5-unit pill bars degraded into a grey smudge. Bars are now 6.5 units wide on 3.5-unit gaps filling 83% of the box, coloured `faint`/`muted`/`accent` so the accent marks the leading bar, all clearing 3:1. Mark-equals-meter is preserved as form only; the meter keeps its greyscale.
+- 2026-09-26: type system re-paired. Display moved from B612 to Barlow Semi Condensed and body from IBM Plex Sans to Archivo; B612 Mono kept. The pairing now contrasts on width rather than nominally on role, and IBM Plex Sans is gone — it was the same "avoided Inter" default the slop audit claimed to have escaped, carrying 20 user-facing strings. Only the five weights actually used are requested, down from eight files. Also removed the `min-width: 320px` floor on `html` and `body`, which forced 15px of page-level horizontal scroll at a 320px viewport once the vertical scrollbar was accounted for.
 - 2026-09-26: fixed two defects. Opening the add-bay form resized all four bays from 280px to 259px because the form was a `flex-1` sibling in the same flex row; it now reserves the trigger's exact `lg:w-44` footprint, with its input and buttons stacked to fit. And the border ladder was split by purpose, so input, select and textarea edges meet 3:1 (3.14:1) while decorative rules stay subtle at 1.55:1 — WCAG 1.4.11 asks 3:1 of control boundaries, not of decoration, and lifting every hairline would have satisfied nothing extra.
 - 2026-09-26: ground moved to instrument black. Base is `oklch(0 0 0)`; surfaces stepped to 0.19 / 0.24; neutrals moved from warm (75) to cool (250) at near-zero chroma; borders became translucent white so one token composites across the ramp, replacing an opacity modifier that could no longer be used; `hold` and `cleared` desaturated to stop them vibrating on black; hex fallbacks recomputed from OKLCH; favicon tile, theme-color and mark contrast all re-derived and re-verified.
 - 2026-09-25: initial Flight Strip system. Replaced the zinc card grid with ruled bays and strips; B612 / IBM Plex Sans / B612 Mono; OKLCH warm near-black + amber accent; priority meter and tail number; Tabler icons at 1.5px; empty states; tokenized Tailwind 3.
