@@ -14,6 +14,9 @@ import { KanbanCard, dropPlaceholderClass } from './KanbanCard';
 import type { MoveDirection } from './KanbanCard';
 
 const panel = 'w-full min-w-0 shrink-0 rounded-strip border border-line bg-surface p-3 lg:w-0 lg:min-w-0 lg:flex-1';
+// The add-bay form must reserve the same footprint as the collapsed trigger
+// (lg:w-44), or opening it steals width from every bay and reflows the board.
+const addPanel = 'w-full min-w-0 shrink-0 rounded-strip border border-line bg-surface p-3 lg:w-44 lg:flex-none';
 const emptyBay = 'px-1 py-4 font-mono text-[11px] uppercase leading-5 tracking-wide text-faint';
 
 interface BoardColumnProps {
@@ -78,5 +81,5 @@ interface AddColumnProps { value: string; inputRef: RefObject<HTMLInputElement>;
 export function AddColumn({ value, inputRef, onChange, onSave, onCancel }: AddColumnProps): JSX.Element {
   const transition = useMotionTransition();
   useEffect(() => { inputRef.current?.focus(); }, [inputRef]);
-  return <motion.div initial={{ opacity: 0, scale: 0.98, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: 8 }} transition={transition} className={panel}><div className="flex gap-2"><Input ref={inputRef} value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onSave(); if (event.key === 'Escape') onCancel(); }} placeholder="Bay name" aria-label="New column name" className="h-9 min-w-0 flex-1" /><Button variant="default" size="icon" onClick={onSave} aria-label="Save column"><IconCheck size={16} stroke={1.5} /></Button><Button variant="outline" size="icon" onClick={onCancel} aria-label="Cancel adding column"><IconX size={16} stroke={1.5} /></Button></div></motion.div>;
+  return <motion.div initial={{ opacity: 0, scale: 0.98, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: 8 }} transition={transition} className={addPanel}><div className="flex flex-col gap-2"><Input ref={inputRef} value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onSave(); if (event.key === 'Escape') onCancel(); }} placeholder="Bay name" aria-label="New column name" className="h-9 w-full" /><div className="flex gap-2"><Button variant="default" size="icon" onClick={onSave} aria-label="Save column" className="flex-1"><IconCheck size={16} stroke={1.5} /></Button><Button variant="outline" size="icon" onClick={onCancel} aria-label="Cancel adding column" className="flex-1"><IconX size={16} stroke={1.5} /></Button></div></div></motion.div>;
 }

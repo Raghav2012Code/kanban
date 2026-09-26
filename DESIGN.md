@@ -60,10 +60,15 @@
   - cleared (done): oklch(0.75 0.1 160) | #72c298
   - warn: oklch(0.79 0.15 78) | #efad32
   - priority meter uses ink (filled) and border-strong (empty); priority is never carried by hue.
-- **Borders are translucent, not opaque.** One hairline token has to sit on `base`, `surface` and `surface-2` and stay correct on all three; an opaque grey cannot, because a value that reads on a near-black ground disappears on a lighter one. Alpha is set so the hairline holds **1.55:1 on base** — matching the solid border it replaced — and `border-strong` holds **1.93:1**. Consequence: opacity modifiers (`border-line/70`) are invalid on these tokens and must not be reintroduced.
+- **Borders are translucent, not opaque.** A hairline token has to sit on `base`, `surface` and `surface-2` and stay correct on all three; an opaque grey cannot, because a value that reads on a near-black ground disappears on a lighter one. Consequence: opacity modifiers (`border-line/70`) are invalid on these tokens and must not be reintroduced.
+- **The ladder is split by purpose, not by taste.** WCAG 1.4.11 asks 3:1 of boundaries needed to *identify a control*; it does not ask it of decorative row rules. So three tokens, each measured on all three grounds:
+  - `border` 0.18 — **1.55:1** on base. Decorative: strip row separators, bay panel frames, the footer rule.
+  - `border-control` 0.36 — **3.14:1** on base. Input, select and textarea edges. These sit on `bg-base`, so the border is the only thing defining them, which is exactly the case the criterion is about.
+  - `border-strong` 0.42 — **3.94:1** on base. Outline buttons and the drop placeholder, both of which identify an interactive affordance.
+  Lifting *every* hairline to 3:1 would have satisfied nothing extra and turned the board into a wireframe, because most of its rules are decorative.
 - The hue moved from warm (75) to cool (250) at near-zero chroma, so the neutrals read as unlit and the amber reads as illumination. `hold` and `cleared` are desaturated from their originals because saturated red and green vibrate against a near-black ground.
 - Verified contrast, measured from the rendered OKLCH rather than the fallback hex: ink/base **17.12**, muted/base **9.12**, faint/base **6.00**, accent/base **10.69**, hold/base **6.74**, cleared/base **9.89**, accent-fg/accent **10.69**, muted/surface **8.01**, faint/surface **5.27**, muted/surface-2 **7.16**, faint/surface-2 **4.71**, ink/surface-2 **13.44**. Tightest pair is faint on surface-2 at 4.71, which still clears AA for body text.
-- Known and deliberately unchanged: hairlines sit well below the 3:1 non-text bar (1.55:1), as they did before (1.54:1). They are structural rhythm, not the sole means of identifying a control. Raising them to 3:1 would mean a `#595959`-class border, which would read as heavy chrome and is a separate decision, not a palette one.
+- Known and deliberately unchanged: decorative hairlines sit at 1.55:1, well below the 3:1 non-text bar, as they always have. They are structural rhythm, not the means of identifying a control, and the criterion does not reach them.
 
 ## Spacing, radius, shadow
 
@@ -75,6 +80,7 @@
 
 - Grid: bounded bays. One flex row of 4-5 bay panels separated by a gap (`gap-3`, `gap-4` at `lg`) on desktop; stacked with the same gap on mobile. No cards wrapping columns, and no shared divider rules between panels.
 - Spacing rhythm: tight-within (strip internals) / loose-between (bays and sections).
+- **Transient panels reserve the footprint of the control that opens them.** The add-bay form occupies the same `lg:w-44` as the collapsed trigger, so opening it cannot take width from the bays. An earlier `flex-1` form was a `lg:flex-1` sibling in the same flex row, which meant all four bays silently resized from 280px to 259px every time the form opened, reflowing every card on the board. Any future panel that appears *in the row* rather than *inside a bay* owes the row the same reservation.
 - Signature layout move: columns rendered as **bay panels** — one border plus a surface fill, never a border plus a shadow. Strips inside are ruled rows, never nested cards.
 - Density: dense | Scanning: F pattern within each bay; header top-left, controls top-right.
 - Responsive: desktop-first dense tool; bays stack below `lg`, controls move from a hover overlay (mouse) to an always-visible in-flow row (touch, via `@media (hover:none)`).
@@ -137,7 +143,8 @@
   --color-muted: oklch(0.74 0.003 250);
   --color-faint: oklch(0.63 0.003 250);
   --color-border: rgb(255 255 255 / 0.18);
-  --color-border-strong: rgb(255 255 255 / 0.24);
+  --color-border-control: rgb(255 255 255 / 0.36);
+  --color-border-strong: rgb(255 255 255 / 0.42);
   --color-accent: oklch(0.79 0.15 78);
   --color-accent-fg: oklch(0 0 0);
   --color-hold: oklch(0.68 0.16 25);
@@ -174,5 +181,6 @@
 
 - 2026-09-26: bays became bounded panels (one border + surface fill) on a gap; strips stay ruled rows inside them; drop placeholders are dashed rows at strip height; added an accessible `Done` marker; added component-level regression tests for Done identity, filtered-move safety, and reduced-motion wiring.
 - 2026-09-26: redrew the brand mark and favicon. The previous mark used the rejected zinc palette, had a tile that vanished against dark chrome, and at 16px its three 5-unit pill bars degraded into a grey smudge. Bars are now 6.5 units wide on 3.5-unit gaps filling 83% of the box, coloured `faint`/`muted`/`accent` so the accent marks the leading bar, all clearing 3:1. Mark-equals-meter is preserved as form only; the meter keeps its greyscale.
+- 2026-09-26: fixed two defects. Opening the add-bay form resized all four bays from 280px to 259px because the form was a `flex-1` sibling in the same flex row; it now reserves the trigger's exact `lg:w-44` footprint, with its input and buttons stacked to fit. And the border ladder was split by purpose, so input, select and textarea edges meet 3:1 (3.14:1) while decorative rules stay subtle at 1.55:1 — WCAG 1.4.11 asks 3:1 of control boundaries, not of decoration, and lifting every hairline would have satisfied nothing extra.
 - 2026-09-26: ground moved to instrument black. Base is `oklch(0 0 0)`; surfaces stepped to 0.19 / 0.24; neutrals moved from warm (75) to cool (250) at near-zero chroma; borders became translucent white so one token composites across the ramp, replacing an opacity modifier that could no longer be used; `hold` and `cleared` desaturated to stop them vibrating on black; hex fallbacks recomputed from OKLCH; favicon tile, theme-color and mark contrast all re-derived and re-verified.
 - 2026-09-25: initial Flight Strip system. Replaced the zinc card grid with ruled bays and strips; B612 / IBM Plex Sans / B612 Mono; OKLCH warm near-black + amber accent; priority meter and tail number; Tabler icons at 1.5px; empty states; tokenized Tailwind 3.

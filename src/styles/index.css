@@ -23,10 +23,14 @@
   --color-faint: oklch(0.63 0.003 250);
   /* Translucent, not opaque: one hairline token must composite correctly over
      base, surface and surface-2 alike. An opaque grey cannot do that across a
-     ramp. Alpha chosen to hold the hairline at 1.55:1 on base, matching the
-     solid border it replaces; line-strong holds 1.93:1. */
+     ramp. The ladder is split by purpose, because WCAG 1.4.11 asks 3:1 only of
+     boundaries needed to identify a control — not of decorative row rules.
+       line        1.55:1 on base  decorative separators and panel frames
+       line-control 3.14:1        input/select/textarea boundaries
+       line-strong 3.94:1         outline buttons and drop affordances */
   --color-border: rgb(255 255 255 / 0.18);
-  --color-border-strong: rgb(255 255 255 / 0.24);
+  --color-border-control: rgb(255 255 255 / 0.36);
+  --color-border-strong: rgb(255 255 255 / 0.42);
   --color-accent: #efad32;
   --color-accent: oklch(0.79 0.15 78);
   --color-accent-fg: #000000;

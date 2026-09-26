@@ -12,6 +12,7 @@ export default {
         muted: 'var(--color-muted)',
         faint: 'var(--color-faint)',
         line: 'var(--color-border)',
+        'line-control': 'var(--color-border-control)',
         'line-strong': 'var(--color-border-strong)',
         accent: 'var(--color-accent)',
         'accent-fg': 'var(--color-accent-fg)',
