@@ -8,7 +8,7 @@
 - Adjectives: exacting, quiet, instrument-like, legible, purposeful.
 - Visual word translations:
   - exacting -> hairline rules, strict bay grid, monospace and tabular figures, 2px radius
-  - quiet -> warm near-black, low chroma, one accent used sparingly, no shadows
+  - quiet -> instrument black, near-zero chroma, one accent used sparingly, no shadows
   - instrument-like -> status rail, tail-number gutter, priority meter, density
   - legible -> 11px floor, 14px UI, 16px inputs, hierarchy from size and weight, not color
   - purposeful -> motion only for state and drag; no hover lift, no decoration
@@ -43,24 +43,27 @@
 
 ## Color
 
-- Strategy: warm near-black instrument panel with a single aviation-amber accent. Deliberately outside the indigo/violet band (H 78). No gradients, no glow.
+- Strategy: instrument black with a single aviation-amber accent. The ground is a true `#000`; every visible edge is a hairline; the amber is the only light source in the composition. Deliberately outside the indigo/violet band (H 78). No gradients, no glow.
 - Distribution: 60 neutral surfaces / 30 structure and type / 10 accent.
-- Palette (role -> OKLCH | hex):
-  - bg: oklch(0.17 0.008 75) | #1b1916
-  - surface: oklch(0.205 0.008 75) | #242220
-  - surface-2: oklch(0.25 0.008 75) | #2c2a27
-  - fg (ink): oklch(0.93 0.012 75) | #edebe7
-  - muted: oklch(0.72 0.012 75) | #b0aca6
-  - faint: oklch(0.62 0.012 75) | #908c86
-  - border: oklch(0.30 0.008 75) | #37342f
-  - border-strong: oklch(0.40 0.008 75) | #4c4842
-  - accent (amber): oklch(0.79 0.15 78) | #dda43c
-  - accent-fg: oklch(0.17 0.02 78) | #1b1916
-  - hold (overdue/destructive): oklch(0.66 0.19 25) | #e0575c
-  - cleared (done): oklch(0.72 0.12 160) | #46c79e
-  - warn: oklch(0.79 0.15 78) | #dda43c
+- Palette (role -> OKLCH | hex). The hex is **computed from** the OKLCH, never authored beside it — the previous warm palette carried hex values that were several steps lighter than their OKLCH twins, so modern browsers and the documented fallbacks were showing different products.
+  - bg: oklch(0 0 0) | #000000
+  - surface: oklch(0.19 0.003 250) | #131415
+  - surface-2: oklch(0.24 0.003 250) | #1e1f21
+  - fg (ink): oklch(0.93 0.002 250) | #e7e8e9
+  - muted: oklch(0.74 0.003 250) | #a9abad
+  - faint: oklch(0.63 0.003 250) | #88898b
+  - border: rgb(255 255 255 / 0.18) — translucent
+  - border-strong: rgb(255 255 255 / 0.24) — translucent
+  - accent (amber): oklch(0.79 0.15 78) | #efad32
+  - accent-fg: oklch(0 0 0) | #000000
+  - hold (overdue/destructive): oklch(0.68 0.16 25) | #ea6a64
+  - cleared (done): oklch(0.75 0.1 160) | #72c298
+  - warn: oklch(0.79 0.15 78) | #efad32
   - priority meter uses ink (filled) and border-strong (empty); priority is never carried by hue.
-- Verified contrast (AA): ink/base 15.6, muted/base 7.7, faint/base 5.2, accent/base 9.7, hold/base 5.6, cleared/base 8.2, accent-fg/accent 9.8, muted/surface 7.2, muted/raised 6.5.
+- **Borders are translucent, not opaque.** One hairline token has to sit on `base`, `surface` and `surface-2` and stay correct on all three; an opaque grey cannot, because a value that reads on a near-black ground disappears on a lighter one. Alpha is set so the hairline holds **1.55:1 on base** — matching the solid border it replaced — and `border-strong` holds **1.93:1**. Consequence: opacity modifiers (`border-line/70`) are invalid on these tokens and must not be reintroduced.
+- The hue moved from warm (75) to cool (250) at near-zero chroma, so the neutrals read as unlit and the amber reads as illumination. `hold` and `cleared` are desaturated from their originals because saturated red and green vibrate against a near-black ground.
+- Verified contrast, measured from the rendered OKLCH rather than the fallback hex: ink/base **17.12**, muted/base **9.12**, faint/base **6.00**, accent/base **10.69**, hold/base **6.74**, cleared/base **9.89**, accent-fg/accent **10.69**, muted/surface **8.01**, faint/surface **5.27**, muted/surface-2 **7.16**, faint/surface-2 **4.71**, ink/surface-2 **13.44**. Tightest pair is faint on surface-2 at 4.71, which still clears AA for body text.
+- Known and deliberately unchanged: hairlines sit well below the 3:1 non-text bar (1.55:1), as they did before (1.54:1). They are structural rhythm, not the sole means of identifying a control. Raising them to 3:1 would mean a `#595959`-class border, which would read as heavy chrome and is a separate decision, not a palette one.
 
 ## Spacing, radius, shadow
 
@@ -107,8 +110,8 @@
 
 ## Dark mode
 
-- Base bg: oklch(0.17 0.008 75), deliberately not `#000`. fg: off-white 0.93.
-- Elevation ramp: base 0.17 -> surface 0.205 -> raised 0.25 (closer to the user is lighter).
+- Base bg: oklch(0 0 0) — true black. fg: off-white 0.93, never `#fff`, which vibrates on a pure black ground.
+- Elevation ramp: base 0.0 -> surface 0.19 -> raised 0.24 (closer to the user is lighter). Steps are wide because black gives no room for a subtle lift.
 - Accent (dark): amber 0.79 already a lighter sibling; borders (0.30) are lighter than the base surface. No glow.
 
 ## Accessibility
@@ -127,18 +130,18 @@
   --font-display: "B612", ui-sans-serif, system-ui, sans-serif;
   --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "B612 Mono", ui-monospace, monospace;
-  --color-bg: oklch(0.17 0.008 75);
-  --color-surface: oklch(0.205 0.008 75);
-  --color-surface-2: oklch(0.25 0.008 75);
-  --color-fg: oklch(0.93 0.012 75);
-  --color-muted: oklch(0.72 0.012 75);
-  --color-faint: oklch(0.62 0.012 75);
-  --color-border: oklch(0.30 0.008 75);
-  --color-border-strong: oklch(0.40 0.008 75);
+  --color-bg: oklch(0 0 0);
+  --color-surface: oklch(0.19 0.003 250);
+  --color-surface-2: oklch(0.24 0.003 250);
+  --color-fg: oklch(0.93 0.002 250);
+  --color-muted: oklch(0.74 0.003 250);
+  --color-faint: oklch(0.63 0.003 250);
+  --color-border: rgb(255 255 255 / 0.18);
+  --color-border-strong: rgb(255 255 255 / 0.24);
   --color-accent: oklch(0.79 0.15 78);
-  --color-accent-fg: oklch(0.17 0.02 78);
-  --color-hold: oklch(0.66 0.19 25);
-  --color-cleared: oklch(0.72 0.12 160);
+  --color-accent-fg: oklch(0 0 0);
+  --color-hold: oklch(0.68 0.16 25);
+  --color-cleared: oklch(0.75 0.1 160);
   --color-warn: oklch(0.79 0.15 78);
   --duration-fast: 150ms;
   --duration-normal: 200ms;
@@ -158,6 +161,8 @@
 - Tells caught and corrected: Inter-only type, no display/body pairing; 10px text below the legibility floor; raw ISO dates in proportional figures; 3-4 line card titles in narrow columns; pure `#000`; no brand accent (white primary button); zero design tokens; full-width "Add column" competing with columns; generic eyebrow+title+search header; no empty state; 24px targets; neutral focus ring; truncated search placeholder; unmodified Lucide set; hover-lift on every card; undeclared dark-only mode.
 - Craft and accessibility: state matrix on every control, focus via accent box-shadow, keyboard/touch move path intact, empty and filtered-empty states designed, icons one set at 1.5px, all contrast pairs pass AA, reduced motion honored.
 - Bare-structure check: strip color/type removed, the skeleton is strips ruled inside bounded bay panels, not equal columns of stacked cards. Distinct from the category default.
+- 2026-09-26 (amendment): the ground was moved to true black, reversing the earlier "deliberately not `#000`" decision. The rejected tell was never *black* — it was the cheap `#000` / mid-grey-border / `#fff`-text combination, where a pure-black ground is paired with opaque grey chrome and pure white type. That is not what shipped. The ground is `#000`, but the surfaces stay near-black (0.19 / 0.24) rather than jumping to grey cards, the borders are translucent white so one token works across the whole ramp, the foreground is off-white `0.93` and never `#fff`, and the amber is the only illumination. The tell list stands; this entry records that the item was re-examined rather than forgotten.
+- 2026-09-26 (amendment): the palette's hex fallbacks were found to disagree with their own OKLCH values — the declared `oklch(0.17 0.008 75)` actually renders as `#110f0c`, not the documented `#1b1916`, so the documented contrast table described a colour no browser was showing. Hex values are now computed from OKLCH, and the contrast table is measured from the rendered values. The previous audit's own accent (`#dda43c`) was likewise not the amber the app painted (`#efad32`), which is why the brand mark and the UI accent had drifted apart.
 
 - Date: 2026-09-26 | Result: bounded-bay revision, pass.
 - Change: bays became individually bordered panels on a gap, replacing the borderless ruled-region skeleton. Strips remain hairline-separated rows inside them.
@@ -169,4 +174,5 @@
 
 - 2026-09-26: bays became bounded panels (one border + surface fill) on a gap; strips stay ruled rows inside them; drop placeholders are dashed rows at strip height; added an accessible `Done` marker; added component-level regression tests for Done identity, filtered-move safety, and reduced-motion wiring.
 - 2026-09-26: redrew the brand mark and favicon. The previous mark used the rejected zinc palette, had a tile that vanished against dark chrome, and at 16px its three 5-unit pill bars degraded into a grey smudge. Bars are now 6.5 units wide on 3.5-unit gaps filling 83% of the box, coloured `faint`/`muted`/`accent` so the accent marks the leading bar, all clearing 3:1. Mark-equals-meter is preserved as form only; the meter keeps its greyscale.
+- 2026-09-26: ground moved to instrument black. Base is `oklch(0 0 0)`; surfaces stepped to 0.19 / 0.24; neutrals moved from warm (75) to cool (250) at near-zero chroma; borders became translucent white so one token composites across the ramp, replacing an opacity modifier that could no longer be used; `hold` and `cleared` desaturated to stop them vibrating on black; hex fallbacks recomputed from OKLCH; favicon tile, theme-color and mark contrast all re-derived and re-verified.
 - 2026-09-25: initial Flight Strip system. Replaced the zinc card grid with ruled bays and strips; B612 / IBM Plex Sans / B612 Mono; OKLCH warm near-black + amber accent; priority meter and tail number; Tabler icons at 1.5px; empty states; tokenized Tailwind 3.
