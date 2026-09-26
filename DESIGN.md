@@ -100,7 +100,10 @@
 
 ## Imagery and illustration
 
-- Mode: none. This is a data tool; the only graphic device is the brand mark (three ascending bars), reused as the priority meter. Avoid stock, blobs, and mascots.
+- Mode: none. This is a data tool; the only graphic device is the brand mark, reused as the priority meter. Avoid stock, blobs, and mascots.
+- Brand mark: three ascending bars on a common baseline, in a 32-unit box. Bars are 6.5 units wide with 3.5-unit gaps, spanning 83% of the box width, with a 2-unit corner radius. The ramp runs `faint` → `muted` → `accent`, so the accent sits only on the leading bar and the ascending heights carry the progression. Every bar clears 3:1 against `base` (5.25 / 7.77 / 7.89), which is why `border-strong` is not used here — at 1.93:1 it cannot carry a mark.
+- The mark is drawn from the token variables rather than literal hex, so it themes with the board. The favicon is the same geometry with the tokens flattened, plus a `base` tile with a `border-strong` hairline so the icon reads on both light and dark browser chrome. The apple touch icon is full-bleed with no corner radius, because iOS applies its own mask.
+- The priority meter keeps `ink` and `border-strong` only. It shares the mark's *form*, never its colour, because priority must never be carried by hue.
 
 ## Dark mode
 
@@ -165,4 +168,5 @@
 ## Changelog
 
 - 2026-09-26: bays became bounded panels (one border + surface fill) on a gap; strips stay ruled rows inside them; drop placeholders are dashed rows at strip height; added an accessible `Done` marker; added component-level regression tests for Done identity, filtered-move safety, and reduced-motion wiring.
+- 2026-09-26: redrew the brand mark and favicon. The previous mark used the rejected zinc palette, had a tile that vanished against dark chrome, and at 16px its three 5-unit pill bars degraded into a grey smudge. Bars are now 6.5 units wide on 3.5-unit gaps filling 83% of the box, coloured `faint`/`muted`/`accent` so the accent marks the leading bar, all clearing 3:1. Mark-equals-meter is preserved as form only; the meter keeps its greyscale.
 - 2026-09-25: initial Flight Strip system. Replaced the zinc card grid with ruled bays and strips; B612 / IBM Plex Sans / B612 Mono; OKLCH warm near-black + amber accent; priority meter and tail number; Tabler icons at 1.5px; empty states; tokenized Tailwind 3.
