@@ -40,6 +40,31 @@ describe('KanbanBoard column counts', () => {
   });
 });
 
+describe('KanbanBoard done identity', () => {
+  it('keeps marking cards done after the done column is renamed', async () => {
+    const board = createSeedState(new Date(2026, 8, 25));
+    const done = board.columns.find((column) => column.id === 'column-done');
+    if (!done) throw new Error('seed is missing the done column');
+    done.title = 'Completed';
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
+    render(<KanbanBoard />);
+    const renamed = await screen.findByLabelText('Completed column');
+    expect(within(renamed).getByRole('img', { name: 'Done' })).toBeInTheDocument();
+  });
+});
+
+describe('KanbanBoard filtered move safety', () => {
+  it('disables positional moves while filtering but keeps cross-column moves', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await user.type(screen.getByLabelText('Search cards by title or description'), 'groceries');
+    const card = within(await screen.findByLabelText('To Do column')).getByRole('group', { name: 'Plan weekly groceries' });
+    expect(within(card).getByRole('button', { name: 'Move Plan weekly groceries up' })).toBeDisabled();
+    expect(within(card).getByRole('button', { name: 'Move Plan weekly groceries down' })).toBeDisabled();
+    expect(within(card).getByRole('button', { name: 'Move Plan weekly groceries to the next column' })).toBeEnabled();
+  });
+});
+
 describe('KanbanBoard column deletion', () => {
   it('explains why a non-empty column cannot be deleted', async () => {
     const user = userEvent.setup();

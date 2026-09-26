@@ -34,6 +34,9 @@ interface KanbanCardProps {
 
 const revealControl = 'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:group-hover:pointer-events-auto [@media(hover:hover)]:group-focus-within:pointer-events-auto';
 
+/** Shared drop target: a dashed row at strip height, so a drop reads as "a strip lands here". */
+export const dropPlaceholderClass = 'h-9 rounded-strip border border-dashed border-line-strong bg-raised';
+
 const moveControls: { direction: MoveDirection; label: string; Icon: typeof IconArrowUp; can: keyof Pick<KanbanCardProps, 'canMoveUp' | 'canMoveDown' | 'canMoveLeft' | 'canMoveRight'> }[] = [
   { direction: 'up', label: 'up', Icon: IconArrowUp, can: 'canMoveUp' },
   { direction: 'down', label: 'down', Icon: IconArrowDown, can: 'canMoveDown' },
@@ -46,7 +49,7 @@ export function KanbanCard({ card, done, overdue, expanded, canMoveUp, canMoveDo
   const canMove = { canMoveUp, canMoveDown, canMoveLeft, canMoveRight };
   const rail = done ? 'bg-cleared' : overdue ? 'bg-hold' : 'bg-line-strong';
   return <>
-    {dropIndicator && <motion.div initial={{ opacity: 0, scaleX: 0.6 }} animate={{ opacity: 1, scaleX: 1 }} transition={transition} className="h-0.5 rounded-full bg-accent" aria-hidden="true" />}
+    {dropIndicator && <motion.div initial={{ opacity: 0, scaleY: 0.6 }} animate={{ opacity: 1, scaleY: 1 }} transition={transition} className={dropPlaceholderClass} aria-hidden="true" />}
     <motion.div layout transition={transition} draggable onDragStart={(event) => onDragStart(event as unknown as DragEvent<HTMLElement>, card.id)} onDragEnd={onDragEnd} onDragOver={(event) => { event.stopPropagation(); onDragOver(event, card.id); }} onDragEnter={(event) => { event.stopPropagation(); onDragEnter(event, card.id); }} onDragLeave={onDragLeave} onDrop={(event) => { event.stopPropagation(); onDrop(event, card.id); }} role="group" aria-label={card.title} className="group relative flex flex-col gap-1.5 border-b border-line/70 px-1 py-2.5 last:border-b-0">
       <div className="flex items-stretch gap-2.5">
         <span aria-hidden="true" className="mt-0.5 hidden w-3 shrink-0 cursor-grab text-faint transition-colors group-hover:text-muted lg:block"><IconGripVertical size={14} stroke={1.5} /></span>
@@ -58,6 +61,7 @@ export function KanbanCard({ card, done, overdue, expanded, canMoveUp, canMoveDo
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
             <PriorityMeter priority={card.priority} />
+            {done && <span role="img" aria-label="Done" className="sr-only">Done</span>}
             {card.dueDate && (overdue
               ? <span role="img" aria-label="Overdue" title={card.dueDate} className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-wide text-hold"><IconAlertTriangle size={12} stroke={1.5} aria-hidden="true" />{formatDueDate(card.dueDate)}</span>
               : <span title={card.dueDate} className="font-mono text-[11px] tabular-nums text-muted">{formatDueDate(card.dueDate)}</span>)}

@@ -17,12 +17,12 @@
 - Archetype: Sage, tempered by the Outlaw.
 - References: admire air-traffic-control flight progress strips (bays, strips, status marks, monospace tails) and Swiss timetable discipline (strict grid, rules over cards, one restrained accent); avoid the dark-SaaS median (rounded zinc cards, three pastel priority pills, indigo gradients).
 - Mode: dark only, deliberately. Density: dense.
-- Constraints: React 18, Tailwind 3, local-first, no schema change. Accessibility bar WCAG 2.2 AA. Must preserve the board-state behavior and its 69 tests.
+- Constraints: React 18, Tailwind 3, local-first, no schema change. Accessibility bar WCAG 2.2 AA. Must preserve the board-state behavior and its 72 tests.
 
 ## Aesthetic
 
 - Direction: bespoke **Flight Strip**. Industrial/utilitarian base with Swiss grid discipline, borrowed from the ATC flight progress strip board.
-- Defining trait: work items are horizontal **strips** laid in **bays** separated by **rules**, not rounded cards with gaps.
+- Defining trait: work items are horizontal **strips** ruled inside a bounded **bay** panel. Bays are surfaces with a defined edge; strips inside them stay hairline-separated rows, so the board never becomes a grid of rounded cards.
 - Signature move: the **status rail** (a thin edge bar whose color carries work state) plus a monospace **tail number** in the strip gutter and a **three-bar priority meter** that echoes the brand mark. Bay headers are a departure-board rule with a monospace count.
 
 ## Typography
@@ -70,9 +70,9 @@
 
 ## Layout and composition
 
-- Grid: ruled bays. One flex row of 4-5 bays separated by vertical rules on desktop; stacked with horizontal rules on mobile. No cards wrapping columns.
+- Grid: bounded bays. One flex row of 4-5 bay panels separated by a gap (`gap-3`, `gap-4` at `lg`) on desktop; stacked with the same gap on mobile. No cards wrapping columns, and no shared divider rules between panels.
 - Spacing rhythm: tight-within (strip internals) / loose-between (bays and sections).
-- Signature layout move: columns rendered as **bays** (borderless regions divided by rules), not as bordered cards.
+- Signature layout move: columns rendered as **bay panels** — one border plus a surface fill, never a border plus a shadow. Strips inside are ruled rows, never nested cards.
 - Density: dense | Scanning: F pattern within each bay; header top-left, controls top-right.
 - Responsive: desktop-first dense tool; bays stack below `lg`, controls move from a hover overlay (mouse) to an always-visible in-flow row (touch, via `@media (hover:none)`).
 
@@ -90,7 +90,7 @@
 
 - Duration scale: fast 150ms, normal 200ms.
 - Easing: `--ease-out: cubic-bezier(0.23, 1, 0.32, 1)` for enter; the strip settle and drop rules use it.
-- What animates: transform and opacity only. `whileHover` lift removed (it communicated nothing). Layout animation is limited to reorder and add/remove.
+- What animates: transform and opacity only. A bay enters on a short `y` settle (14px) so a newly bounded panel reads as arriving; strips settle and drop placeholders scale in on the same transition. `whileHover` lift removed (it communicated nothing). Layout animation is limited to reorder and add/remove.
 - Reduced motion: `useReducedMotion` swaps the spring for a zero-duration transition; `motion-safe:active:` gates press scale.
 
 ## Iconography
@@ -146,15 +146,23 @@
 
 ## Cards and surfaces
 
-- Cards/surfaces: strips use defined edges only (border-bottom rule + status rail); fields and buttons use a border, never a shadow. Radius 2px. No cards-in-cards. Overlays (strip controls) use a raised surface with a border, no shadow.
+- Cards/surfaces: a bay is one border plus one surface fill. Inside it, strips are hairline-separated rows (`border-b`, last child none) carrying the status rail; they never take their own border or background. Fields and buttons use a border, never a shadow. Radius 2px everywhere. No cards-in-cards. Overlays (strip controls) use a raised surface with a border, no shadow.
+- Nesting invariant: exactly one border per level. A bordered element is never also given a background *and* an inner border on the same child row.
 
 ## Slop audit
 
 - Date: 2026-09-25 | Result: fixed 16 tells, pass.
 - Tells caught and corrected: Inter-only type, no display/body pairing; 10px text below the legibility floor; raw ISO dates in proportional figures; 3-4 line card titles in narrow columns; pure `#000`; no brand accent (white primary button); zero design tokens; full-width "Add column" competing with columns; generic eyebrow+title+search header; no empty state; 24px targets; neutral focus ring; truncated search placeholder; unmodified Lucide set; hover-lift on every card; undeclared dark-only mode.
 - Craft and accessibility: state matrix on every control, focus via accent box-shadow, keyboard/touch move path intact, empty and filtered-empty states designed, icons one set at 1.5px, all contrast pairs pass AA, reduced motion honored.
-- Bare-structure check: strip color/type removed, the skeleton is bays-of-strips on a ruled single surface, not equal bordered columns of cards. Distinct from the category default.
+- Bare-structure check: strip color/type removed, the skeleton is strips ruled inside bounded bay panels, not equal columns of stacked cards. Distinct from the category default.
+
+- Date: 2026-09-26 | Result: bounded-bay revision, pass.
+- Change: bays became individually bordered panels on a gap, replacing the borderless ruled-region skeleton. Strips remain hairline-separated rows inside them.
+- Tells checked and deliberately **not** reintroduced: rounded zinc cards (radius stays 2px via `rounded-strip`), sub-11px type (the 10px count badge is gone; mono labels hold the 11px floor), the unmodified Lucide set (Tabler at 1.5px), hardcoded hex instead of tokens (`#09090b`/`zinc-*` replaced by `bg-surface`/`border-line`), and a missing type pairing.
+- Invariant added: one border per nesting level; a bordered bay never also carries a drop shadow, and strips inside never take their own border.
+- Craft and accessibility: an explicit `Done` marker (`role="img"`) now names the state for assistive tech, so completion no longer depends on perceiving strikethrough or the rail hue. Behavior held: Done identity stays on the stable column id, and positional moves stay disabled under an active filter.
 
 ## Changelog
 
+- 2026-09-26: bays became bounded panels (one border + surface fill) on a gap; strips stay ruled rows inside them; drop placeholders are dashed rows at strip height; added an accessible `Done` marker; added component-level regression tests for Done identity, filtered-move safety, and reduced-motion wiring.
 - 2026-09-25: initial Flight Strip system. Replaced the zinc card grid with ruled bays and strips; B612 / IBM Plex Sans / B612 Mono; OKLCH warm near-black + amber accent; priority meter and tail number; Tabler icons at 1.5px; empty states; tokenized Tailwind 3.
