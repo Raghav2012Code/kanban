@@ -13,6 +13,8 @@ export interface ColumnItem {
   id: string;
   title: string;
   cardIds: string[];
+  /** Optional. Absent means unrestricted, so the field is purely additive. */
+  limit?: number;
 }
 
 export interface BoardState {

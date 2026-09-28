@@ -161,6 +161,142 @@ describe('KanbanBoard card editing', () => {
   });
 });
 
+describe('KanbanBoard Work In Progress limits', () => {
+  const setLimit = async (user: ReturnType<typeof userEvent.setup>, column: string, value: string) => {
+    await user.click(screen.getByRole('button', { name: `Set Work In Progress limit for ${column}` }));
+    const input = screen.getByLabelText(`Work In Progress limit for ${column}`);
+    await user.clear(input);
+    if (value) await user.type(input, value);
+    await user.keyboard('{Enter}');
+  };
+
+  it('shows a count against the limit, and clears the limit when the value is emptied', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await setLimit(user, 'To Do', '5');
+    expect(within(screen.getByLabelText('To Do column')).getByTitle('3 of 3 cards')).toHaveTextContent('3/5');
+
+    await setLimit(user, 'To Do', '');
+    expect(within(screen.getByLabelText('To Do column')).getByTitle('3 of 3 cards')).toHaveTextContent('3');
+  });
+
+  it('says so in words when a column is over its limit, not by colour alone', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await setLimit(user, 'To Do', '2');
+
+    const bay = screen.getByLabelText('To Do column');
+    expect(within(bay).getByText('Over')).toBeInTheDocument();
+    expect(within(bay).getByTitle(/over the Work In Progress limit/i)).toHaveTextContent('3/2');
+  });
+
+  it('refuses a move into a saturated column and explains why', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+    await setLimit(user, 'To Do', '3');
+
+    await user.click(screen.getByRole('button', { name: 'Move Research personal finance apps to the next column' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/at its Work In Progress limit of 3/i);
+    const backlog = within(screen.getByLabelText('Backlog column')).getAllByRole('group');
+    expect(backlog.some((strip) => strip.getAttribute('aria-label') === 'Research personal finance apps')).toBe(true);
+  });
+
+  it('keeps the badge honest while a filter is active', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+    await setLimit(user, 'To Do', '2');
+
+    await user.type(screen.getByLabelText('Search cards by title or description'), 'groceries');
+
+    // Visible count over limit, not total membership, and the saturation marker
+    // agrees with the count on screen rather than contradicting it.
+    const bay = screen.getByLabelText('To Do column');
+    expect(within(bay).getByTitle('1 of 3 cards')).toHaveTextContent('1/2');
+    expect(within(bay).queryByText('Over')).not.toBeInTheDocument();
+  });
+
+  it('persists a limit and leaves older boards loadable', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+    await setLimit(user, 'To Do', '4');
+
+    const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}');
+    expect(saved.columns.find((column: { id: string }) => column.id === 'column-todo')?.limit).toBe(4);
+    expect(saved.columns.find((column: { id: string }) => column.id === 'column-done')?.limit).toBeUndefined();
+  });
+});
+
+describe('KanbanBoard undo and redo', () => {
+  it('starts with the controls disabled, so there is never a mystery', async () => {
+    render(<KanbanBoard />);
+    await screen.findByLabelText('Backlog column');
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
+  });
+
+  it('restores a deleted card, and puts it back where it was', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+
+    const group = await screen.findByRole('group', { name: 'Archive tax documents' });
+    await user.click(within(group).getByRole('button', { name: 'Delete Archive tax documents' }));
+    expect(screen.queryByRole('group', { name: 'Archive tax documents' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+
+    const restored = await screen.findByRole('group', { name: 'Archive tax documents' });
+    const done = within(screen.getByLabelText('Done column')).getAllByRole('group');
+    expect(done.some((strip) => strip.getAttribute('aria-label') === 'Archive tax documents')).toBe(true);
+    expect(restored).toBeInTheDocument();
+  });
+
+  it('redoes an undo that overshot', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+
+    await user.click(screen.getByRole('button', { name: 'Delete Research personal finance apps' }));
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await screen.findByRole('group', { name: 'Research personal finance apps' });
+
+    await user.click(screen.getByRole('button', { name: 'Redo' }));
+    expect(screen.queryByRole('group', { name: 'Research personal finance apps' })).not.toBeInTheDocument();
+  });
+
+  it('undoes with the keyboard', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+
+    await user.click(await screen.findByRole('button', { name: 'Delete Research personal finance apps' }));
+    await user.keyboard('{Control>}z{/Control}');
+
+    await screen.findByRole('group', { name: 'Research personal finance apps' });
+  });
+
+  it('leaves the browser own text undo alone while typing in a field', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+
+    await user.click(await screen.findByRole('button', { name: 'Delete Research personal finance apps' }));
+
+    const search = screen.getByLabelText('Search cards by title or description');
+    await user.click(search);
+    await user.keyboard('tax');
+    await user.keyboard('{Control>}z{/Control}');
+
+    // The card is still deleted: Ctrl+Z inside the search field meant "undo my typing".
+    expect(screen.queryByRole('group', { name: 'Research personal finance apps' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
+  });
+});
+
 describe('KanbanBoard column ordering', () => {
   it('reorders the bays, carrying each column cards with it', async () => {
     const user = userEvent.setup();

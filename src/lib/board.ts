@@ -1,13 +1,38 @@
-import type { BoardState, CardDraft, CardItem, PriorityFilter } from '../types/kanban';
+import type { BoardState, CardDraft, CardItem, ColumnItem, PriorityFilter } from '../types/kanban';
 
 export interface MoveCardOptions {
   positional?: boolean;
+}
+
+/**
+ * Whether a column is already carrying as much as its Work In Progress limit
+ * allows. A column with no limit set is unrestricted, so limits stay opt-in and a
+ * stale number can always be cleared.
+ */
+export function isColumnAtLimit(column: ColumnItem): boolean {
+  return column.limit !== undefined && column.cardIds.length >= column.limit;
+}
+
+/**
+ * Whether a column's count exceeds its limit. The caller passes the count it is
+ * displaying, so a filtered view cannot show a count and a saturation marker that
+ * disagree. Defaults to full membership for the unfiltered case.
+ */
+export function isColumnOverLimit(column: ColumnItem, visibleCount: number = column.cardIds.length): boolean {
+  return column.limit !== undefined && visibleCount > column.limit;
 }
 
 export function moveCard(state: BoardState, cardId: string, targetColumnId: string, targetCardId?: string, insertAfter = false, options: MoveCardOptions = {}): BoardState {
   const sourceColumn = state.columns.find((column) => column.cardIds.includes(cardId));
   const targetColumn = state.columns.find((column) => column.id === targetColumnId);
   if (!sourceColumn || !targetColumn) return state;
+
+  // A Work In Progress limit is enforced here rather than in the component, so no
+  // caller can route around it: a cross-column move into a saturated column is
+  // refused. Reordering inside a column does not change the count, so it is never
+  // refused. The caller asks isColumnAtLimit first, purely so it can explain the
+  // refusal, because a limit that silently refused would be worse than no limit.
+  if (sourceColumn.id !== targetColumn.id && isColumnAtLimit(targetColumn)) return state;
 
   const positional = options.positional !== false;
   const anchorId = positional ? targetCardId : undefined;
@@ -30,8 +55,14 @@ export function moveCard(state: BoardState, cardId: string, targetColumnId: stri
   };
 }
 
-export function moveCardWithinColumn(state: BoardState, cardId: string, direction: 'up' | 'down'): BoardState {
-  const column = state.columns.find((item) => item.cardIds.includes(cardId));
+/** The column a card would land in, so a caller can explain a refusal before attempting it. */
+export function adjacentColumnOf(state: BoardState, cardId: string, direction: 'left' | 'right'): ColumnItem | undefined {
+  const index = state.columns.findIndex((column) => column.cardIds.includes(cardId));
+  if (index < 0) return undefined;
+  return state.columns[direction === 'left' ? index - 1 : index + 1];
+}
+
+export function moveCardWithinColumn(state: BoardState, cardId: string, direction: 'up' | 'down'): BoardState {  const column = state.columns.find((item) => item.cardIds.includes(cardId));
   if (!column) return state;
   const index = column.cardIds.indexOf(cardId);
   const targetIndex = direction === 'up' ? index - 1 : index + 1;

@@ -1,9 +1,10 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { IconArrowLeft, IconArrowRight, IconCheck, IconPlus, IconTrash, IconX } from '@tabler/icons-react';
+import { IconArrowLeft, IconArrowRight, IconCheck, IconGauge, IconPlus, IconTrash, IconX } from '@tabler/icons-react';
 import { Fragment, useEffect, useRef } from 'react';
 import type { DragEvent, KeyboardEvent, RefObject } from 'react';
 import { useMotionTransition } from '@/hooks/useMotionTransition';
 import { isCardOverdue } from '@/lib/dates';
+import { isColumnOverLimit } from '@/lib/board';
 import { isDoneColumn } from '@/lib/done';
 import { cn } from '@/lib/utils';
 import { cardToDraft } from '@/lib/validation';
@@ -45,6 +46,12 @@ interface BoardColumnProps {
   onSaveCardDraft: (cardId: string, draft: CardDraft) => void;
   onCancelEditCard: () => void;
   onMoveColumn: (direction: 'left' | 'right') => void;
+  settingLimit: boolean;
+  limitValue: string;
+  onStartLimit: () => void;
+  onLimitChange: (value: string) => void;
+  onSaveLimit: () => void;
+  onCancelLimit: () => void;
   onMove: (id: string, direction: MoveDirection) => void;
   expandedIds: Set<string>;
   onToggleExpanded: (id: string) => void;
@@ -56,19 +63,31 @@ interface BoardColumnProps {
   onDrop: (event: DragEvent<HTMLElement>, cardId?: string) => void;
 }
 
-export function BoardColumn({ column, cards, activeForm, renaming, renameValue, draggedCardId, dropTarget, positionalEnabled, canMoveLeft, canMoveRight, onStartCardForm, onSaveCard, onCancelCardForm, onBeginRename, onRenameChange, onSaveRename, onCancelRename, onDeleteColumn, onDeleteCard, onEditCard, editingCardId, onSaveCardDraft, onCancelEditCard, onMoveColumn, onMove, expandedIds, onToggleExpanded, onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop }: BoardColumnProps): JSX.Element {
+export function BoardColumn({ column, cards, activeForm, renaming, renameValue, draggedCardId, dropTarget, positionalEnabled, canMoveLeft, canMoveRight, onStartCardForm, onSaveCard, onCancelCardForm, onBeginRename, onRenameChange, onSaveRename, onCancelRename, onDeleteColumn, onDeleteCard, onEditCard, editingCardId, onSaveCardDraft, onCancelEditCard, onMoveColumn, settingLimit, limitValue, onStartLimit, onLimitChange, onSaveLimit, onCancelLimit, onMove, expandedIds, onToggleExpanded, onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop }: BoardColumnProps): JSX.Element {
   const renameRef = useRef<HTMLInputElement>(null);
+  const limitRef = useRef<HTMLInputElement>(null);
   const transition = useMotionTransition();
   useEffect(() => { if (renaming) { renameRef.current?.focus(); renameRef.current?.select(); } }, [renaming]);
+  useEffect(() => { if (settingLimit) { limitRef.current?.focus(); limitRef.current?.select(); } }, [settingLimit]);
   const isDone = isDoneColumn(column);
   const total = column.cardIds.length;
   const showColumnDropIndicator = Boolean(draggedCardId && dropTarget?.columnId === column.id && !dropTarget.cardId);
+  const hasLimit = column.limit !== undefined;
+  const overLimit = isColumnOverLimit(column, cards.length);
+  // Over-limit is stated in words, never by hue alone, so the signal survives
+  // greyscale and colour blindness.
+  const countLabel = hasLimit ? `${cards.length}/${column.limit}` : String(cards.length);
+  const countTitle = hasLimit
+    ? `${cards.length} of ${total} cards${overLimit ? ', over the Work In Progress limit' : ''}`
+    : `${cards.length} of ${total} cards`;
   return <motion.section layout variants={{ hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } }} initial="hidden" animate="visible" transition={transition} className={panel} onDragOver={(event) => onDragOver(event)} onDragEnter={(event) => onDragEnter(event)} onDragLeave={onDragLeave} onDrop={(event) => onDrop(event)} aria-label={`${column.title} column`}>
     <div className="flex items-center gap-2 border-b border-line pb-2">
       {renaming
         ? <Input ref={renameRef} value={renameValue} onChange={(event) => onRenameChange(event.target.value)} onBlur={onSaveRename} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key === 'Enter') onSaveRename(); if (event.key === 'Escape') onCancelRename(); }} aria-label="Rename column" className="h-7 min-w-0 flex-1 px-2 py-0.5 text-sm" />
         : <Button variant="ghost" onDoubleClick={onBeginRename} className="h-auto min-w-0 flex-1 justify-start px-0 py-0 font-display text-xs font-bold uppercase tracking-[0.12em] text-ink hover:bg-transparent hover:text-accent" title="Double-click to rename">{column.title}</Button>}
-      <span title={`${cards.length} of ${total} cards`} className="shrink-0 font-mono text-xs tabular-nums text-muted">{cards.length}</span>
+      {settingLimit
+        ? <Input ref={limitRef} type="number" min={0} value={limitValue} onChange={(event) => onLimitChange(event.target.value)} onBlur={onSaveLimit} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key === 'Enter') onSaveLimit(); if (event.key === 'Escape') onCancelLimit(); }} aria-label={`Work In Progress limit for ${column.title}`} title="Leave empty for no limit" className="h-7 w-16 shrink-0 px-1 text-center font-mono text-xs" />
+        : <><span title={countTitle} className={cn('shrink-0 font-mono text-xs tabular-nums', overLimit ? 'text-hold' : 'text-muted')}>{countLabel}</span>{overLimit && <span className="shrink-0 font-mono text-[11px] uppercase tracking-wide text-hold">Over</span>}<Button variant="ghost" size="icon" onClick={onStartLimit} aria-label={`Set Work In Progress limit for ${column.title}`} title={hasLimit ? `Limit ${column.limit}` : 'No limit set'} className="h-7 w-7 text-faint"><IconGauge size={14} stroke={1.5} /></Button></>}
       <Button variant="ghost" size="icon" onClick={() => onMoveColumn('left')} disabled={!canMoveLeft} aria-label={`Move ${column.title} column left`} title="Move column left" className="h-7 w-7 text-faint"><IconArrowLeft size={14} stroke={1.5} /></Button>
       <Button variant="ghost" size="icon" onClick={() => onMoveColumn('right')} disabled={!canMoveRight} aria-label={`Move ${column.title} column right`} title="Move column right" className="h-7 w-7 text-faint"><IconArrowRight size={14} stroke={1.5} /></Button>
       <Button variant="destructive" size="icon" onClick={onDeleteColumn} aria-label={`Delete ${column.title} column`} title={total > 0 ? 'Only empty columns can be deleted' : 'Delete column'} className="h-7 w-7"><IconTrash size={14} stroke={1.5} /></Button>

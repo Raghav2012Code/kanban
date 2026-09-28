@@ -36,8 +36,12 @@ export function isValidBoard(value: unknown): value is BoardState {
   const referencedCards = new Set<string>();
   for (const column of candidate.columns) {
     if (!column || typeof column !== 'object') return false;
-    const item = column as { id?: unknown; title?: unknown; cardIds?: unknown };
+    const item = column as { id?: unknown; title?: unknown; cardIds?: unknown; limit?: unknown };
     if (typeof item.id !== 'string' || !item.id.trim() || columnIds.has(item.id) || typeof item.title !== 'string' || !item.title.trim() || !Array.isArray(item.cardIds)) return false;
+    // The limit is optional and additive, but a present one is checked rather than
+    // ignored: without this a corrupted limit would load silently and the count
+    // badge would render nonsense.
+    if (item.limit !== undefined && (typeof item.limit !== 'number' || !Number.isInteger(item.limit) || item.limit < 0)) return false;
     columnIds.add(item.id);
     for (const cardId of item.cardIds) {
       if (typeof cardId !== 'string' || !cards[cardId] || referencedCards.has(cardId)) return false;

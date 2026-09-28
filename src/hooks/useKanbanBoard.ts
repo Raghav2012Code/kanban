@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
-import { loadBoardState, persistBoardState } from '../lib/persistence';
+import { isValidBoard, loadBoardState, persistBoardState } from '../lib/persistence';
 import type { BoardState } from '../types/kanban';
+
+/** Bounded so memory cannot grow without limit. */
+export const HISTORY_LIMIT = 50;
+
+interface BoardHistory {
+  board: BoardState;
+  past: BoardState[];
+  future: BoardState[];
+}
 
 export interface StorageWarning {
   kind: 'corrupt' | 'quota' | 'unavailable' | 'unknown';
@@ -9,14 +17,21 @@ export interface StorageWarning {
 
 export interface UseKanbanBoardResult {
   board: BoardState;
-  setBoard: Dispatch<SetStateAction<BoardState>>;
+  /** The only way to change the board, so every mutation is recorded exactly once. */
+  mutate: (updater: (current: BoardState) => BoardState) => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
   storageWarning: StorageWarning | null;
   dismissStorageWarning: () => void;
 }
 
 export function useKanbanBoard(): UseKanbanBoardResult {
   const [initial] = useState(() => loadBoardState());
-  const [board, setBoard] = useState<BoardState>(initial.board);
+  // One object rather than three states, so a mutation and its history entry are
+  // applied atomically and cannot be recorded twice or half-written.
+  const [state, setState] = useState<BoardHistory>(() => ({ board: initial.board, past: [], future: [] }));
   const [storageWarning, setStorageWarning] = useState<StorageWarning | null>(() => {
     if (initial.status === 'corrupt') return { kind: 'corrupt' };
     if (initial.status === 'unavailable') return { kind: 'unavailable' };
@@ -25,9 +40,48 @@ export function useKanbanBoard(): UseKanbanBoardResult {
   const dismissedKinds = useRef<Set<StorageWarning['kind']>>(new Set());
 
   useEffect(() => {
-    const result = persistBoardState(board);
+    const result = persistBoardState(state.board);
     if (!result.ok && !dismissedKinds.current.has(result.reason)) setStorageWarning({ kind: result.reason });
-  }, [board]);
+  }, [state.board]);
+
+  const mutate = useCallback((updater: (current: BoardState) => BoardState) => {
+    setState((current) => {
+      const next = updater(current.board);
+      // A transition that changes nothing is not a mutation: it must not grow the
+      // history, and it must not discard the redo tail either.
+      if (next === current.board) return current;
+      // A mutation that leaves the board invalid is refused rather than recorded, so
+      // a bad write cannot be persisted and cannot be undone into.
+      if (!isValidBoard(next)) return current;
+      return { board: next, past: [...current.past, current.board].slice(-HISTORY_LIMIT), future: [] };
+    });
+  }, []);
+
+  // A restore is refused rather than applied when the snapshot no longer validates,
+  // so undo can never load a board the rest of the app would reject.
+  const undo = useCallback(() => {
+    setState((current) => {
+      const previous = current.past[current.past.length - 1];
+      if (!previous || !isValidBoard(previous)) return current;
+      return {
+        board: previous,
+        past: current.past.slice(0, -1),
+        future: [current.board, ...current.future].slice(0, HISTORY_LIMIT),
+      };
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    setState((current) => {
+      const next = current.future[0];
+      if (!next || !isValidBoard(next)) return current;
+      return {
+        board: next,
+        past: [...current.past, current.board].slice(-HISTORY_LIMIT),
+        future: current.future.slice(1),
+      };
+    });
+  }, []);
 
   const dismissStorageWarning = useCallback(() => {
     setStorageWarning((current) => {
@@ -36,5 +90,14 @@ export function useKanbanBoard(): UseKanbanBoardResult {
     });
   }, []);
 
-  return { board, setBoard, storageWarning, dismissStorageWarning };
+  return {
+    board: state.board,
+    mutate,
+    undo,
+    redo,
+    canUndo: state.past.length > 0,
+    canRedo: state.future.length > 0,
+    storageWarning,
+    dismissStorageWarning,
+  };
 }

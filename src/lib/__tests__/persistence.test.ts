@@ -87,6 +87,33 @@ describe('loadBoardState', () => {
     expect(result.status).toBe('loaded');
     expect(result.board).toEqual(seed);
   });
+
+  it('loads a board carrying Work In Progress limits', () => {
+    const board = createSeedState();
+    const first = board.columns[0];
+    if (!first) throw new Error('seed has no columns');
+    first.limit = 2;
+    const storage = memoryStorage({ [STORAGE_KEY]: JSON.stringify(board) });
+    expect(loadBoardState(storage).board.columns[0]?.limit).toBe(2);
+  });
+
+  it('loads a board written before limits existed, unchanged and unmigrated', () => {
+    const seed = createSeedState(new Date(2026, 8, 25));
+    const result = loadBoardState(memoryStorage({ [STORAGE_KEY]: JSON.stringify(seed) }));
+    expect(result.status).toBe('loaded');
+    expect(result.board).toEqual(seed);
+    expect(result.board.columns.every((column) => column.limit === undefined)).toBe(true);
+  });
+
+  it('rejects a malformed limit rather than quietly ignoring it', () => {
+    for (const limit of ['two', -1, 1.5, null]) {
+      const board = createSeedState();
+      const first = board.columns[0];
+      if (!first) throw new Error('seed has no columns');
+      (first as unknown as { limit: unknown }).limit = limit;
+      expect(isValidBoard(JSON.parse(JSON.stringify(board))), `limit ${JSON.stringify(limit)}`).toBe(false);
+    }
+  });
 });
 
 describe('persistBoardState', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { addCard, isFilterActive, moveCard, moveCardToAdjacentColumn, moveCardWithinColumn, moveColumnToAdjacent, pruneExpandedIds, removeCard, resolveInsertAfter, updateCard } from '../board';
-import type { BoardState, CardDraft, CardItem } from '../../types/kanban';
+import { addCard, isColumnAtLimit, isColumnOverLimit, isFilterActive, moveCard, moveCardToAdjacentColumn, moveCardWithinColumn, moveColumnToAdjacent, pruneExpandedIds, removeCard, resolveInsertAfter, updateCard } from '../board';
+import type { BoardState, CardDraft, CardItem, ColumnItem } from '../../types/kanban';
 
 function board(): BoardState {
   return {
@@ -192,6 +192,52 @@ describe('isFilterActive', () => {
     expect(isFilterActive('   ', 'all')).toBe(false);
     expect(isFilterActive('tax', 'all')).toBe(true);
     expect(isFilterActive('', 'high')).toBe(true);
+  });
+});
+
+describe('Work In Progress limits', () => {
+  const limited = (limit: number, cardIds: string[]): ColumnItem => ({ id: 'col-3', title: 'Three', cardIds, limit });
+
+  it('reports a column at its limit once it is full', () => {
+    expect(isColumnAtLimit(limited(2, ['a', 'b']))).toBe(true);
+    expect(isColumnAtLimit(limited(2, ['a']))).toBe(false);
+    expect(isColumnOverLimit(limited(2, ['a', 'b', 'c']))).toBe(true);
+  });
+
+  it('treats a column with no limit set as unrestricted', () => {
+    expect(isColumnAtLimit({ id: 'col-3', title: 'Three', cardIds: ['a', 'b', 'c'] })).toBe(false);
+    expect(isColumnOverLimit({ id: 'col-3', title: 'Three', cardIds: ['a', 'b', 'c'] })).toBe(false);
+  });
+
+  it('refuses a cross-column move into a saturated column', () => {
+    const state = board();
+    state.columns.push(limited(1, ['e']));
+    expect(ids(moveCard(state, 'a', 'col-3'), 'col-3')).toEqual(['e']);
+    expect(ids(state, 'col-3')).toEqual(['e']);
+  });
+
+  it('allows a cross-column move while the target has room', () => {
+    const state = board();
+    state.columns.push(limited(2, ['e']));
+    expect(ids(moveCard(state, 'a', 'col-3'), 'col-3')).toEqual(['e', 'a']);
+  });
+
+  it('never refuses a reorder inside a column, because the count does not change', () => {
+    const state = board();
+    state.columns.push(limited(1, ['e']));
+    expect(ids(moveCard(state, 'a', 'col-1', 'b', true), 'col-1')).toEqual(['b', 'a', 'e']);
+  });
+
+  it('never refuses a move out of a saturated column', () => {
+    const state = board();
+    state.columns[0] = { ...state.columns[0], limit: 3 };
+    expect(ids(moveCard(state, 'a', 'col-2'), 'col-2')).toEqual(['c', 'd', 'a']);
+  });
+
+  it('applies the limit through every caller, because it lives in the transition', () => {
+    const state = board();
+    state.columns.push(limited(1, ['e']));
+    expect(ids(moveCardToAdjacentColumn(state, 'a', 'right'), 'col-3')).toEqual(['e']);
   });
 });
 
