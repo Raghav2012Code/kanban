@@ -4,7 +4,7 @@
 
 - Artifact type: Kanban / project tool delivered as a SaaS application surface.
 - Positioning: utilitarian, technical, instrument-like.
-- Audience: an individual running their own work, technically comfortable. Single-user, local-first. Primary action: keep personal work flowing and see its true state.
+- Audience: an individual running their own work, technically comfortable. Single-user, local-first, and every feature serves one person on one device: the board lives in browser storage, nothing is sent anywhere, and no action is attributed to anyone because there is nobody else. Primary action: keep personal work flowing and see its true state.
 - Adjectives: exacting, quiet, instrument-like, legible, purposeful.
 - Visual word translations:
   - exacting -> hairline rules, strict bay grid, monospace and tabular figures, 2px radius
@@ -13,11 +13,11 @@
   - legible -> 11px floor, 14px UI, 16px inputs, hierarchy from size and weight, not color
   - purposeful -> motion only for state and drag; no hover lift, no decoration
 - Aesthetic essence (3 words): precision, flow, control.
-- Single-minded proposition: the board reads like a working control surface for your own work, not a generic task app.
+- Single-minded proposition: the board reads like a working control surface for your own work, not a generic task app. One person, one device, no account: nothing is sent anywhere and no action is attributed to anyone, because there is nobody else. Adding a second person is a different product with genuinely hard problems rather than a feature to bolt on.
 - Archetype: Sage, tempered by the Outlaw.
 - References: admire air-traffic-control flight progress strips (bays, strips, status marks, monospace tails) and Swiss timetable discipline (strict grid, rules over cards, one restrained accent); avoid the dark-SaaS median (rounded zinc cards, three pastel priority pills, indigo gradients).
 - Mode: dark only, deliberately. Density: dense.
-- Constraints: React 18, Tailwind 3, local-first, no schema change. Accessibility bar WCAG 2.2 AA. Must preserve the board-state behavior, and the whole existing test suite must keep passing.
+- Constraints: React 18, Tailwind 3, local-first, and the persisted board shape fixed — the only change so far is an optional column limit, which is additive and needs no migration. Accessibility bar WCAG 2.2 AA. Must preserve the board-state behavior, and the whole existing test suite must keep passing.
 
 ## Aesthetic
 

@@ -16,7 +16,7 @@ npm run preview
 
 `npm run check` is the single gate — it runs the type checker, the test suite, and the production build. CI runs exactly that script rather than restating its steps, so a green local run and a green pipeline mean the same thing.
 
-The board persists its state in `localStorage` under `noir_kanban_state`. There is no backend.
+The board persists its state in `localStorage` under `noir_kanban_state`. There is no backend: nothing is sent anywhere, and no action is attributed to anyone because there is nobody else. Which columns are collapsed is presentation rather than work, so it lives under `noir_kanban_collapsed_columns` and never touches the saved board.
 
 ## Design
 
