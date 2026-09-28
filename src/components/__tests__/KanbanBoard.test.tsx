@@ -98,3 +98,101 @@ describe('KanbanBoard card deletion', () => {
     expect(screen.queryByText(/Compare budgeting workflows/i)).not.toBeInTheDocument();
   });
 });
+
+const bayOrder = (): (string | null)[] =>
+  screen.getAllByRole('region').map((bay) => bay.getAttribute('aria-label'));
+
+describe('KanbanBoard card editing', () => {
+  it('edits a card in place, preserving its slot and its filed date', async () => {
+    const user = userEvent.setup();
+    const board = createSeedState(new Date(2026, 8, 25));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
+    render(<KanbanBoard />);
+
+    const filedAt = board.cards['card-groceries'].createdAt;
+    const group = await screen.findByRole('group', { name: 'Plan weekly groceries' });
+    await user.click(within(group).getByRole('button', { name: 'Edit Plan weekly groceries' }));
+
+    const form = await screen.findByRole('form', { name: 'Edit card' });
+    const title = within(form).getByLabelText('Card title');
+    expect(title, 'the form must open on the card current values, not a blank').toHaveValue('Plan weekly groceries');
+
+    await user.clear(title);
+    await user.type(title, 'Plan groceries and staples');
+    await user.click(within(form).getByRole('button', { name: 'Save changes' }));
+
+    await screen.findByRole('group', { name: 'Plan groceries and staples' });
+    const strips = within(screen.getByLabelText('To Do column'))
+      .getAllByRole('group')
+      .map((strip) => strip.getAttribute('aria-label'));
+    expect(strips, 'correcting a card must not reorder the board').toEqual([
+      'Plan groceries and staples',
+      'Book dentist appointment',
+      'Organize reading list',
+    ]);
+
+    const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}');
+    expect(saved.cards['card-groceries'].createdAt, 'editing must not falsify the filed date').toBe(filedAt);
+  });
+
+  it('offers an edit and a file form under different names, so they cannot be confused', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+
+    const todo = await screen.findByLabelText('To Do column');
+    await user.click(within(todo).getByRole('button', { name: 'File card' }));
+    expect(await screen.findByRole('form', { name: 'File card' })).toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'Edit card' })).not.toBeInTheDocument();
+  });
+
+  it('abandons an edit without saving', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+
+    const group = await screen.findByRole('group', { name: 'Plan weekly groceries' });
+    await user.click(within(group).getByRole('button', { name: 'Edit Plan weekly groceries' }));
+    const form = await screen.findByRole('form', { name: 'Edit card' });
+    await user.clear(within(form).getByLabelText('Card title'));
+    await user.type(within(form).getByLabelText('Card title'), 'Discarded');
+    await user.click(within(form).getByRole('button', { name: 'Cancel' }));
+
+    expect(await screen.findByRole('group', { name: 'Plan weekly groceries' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Discarded' })).not.toBeInTheDocument();
+  });
+});
+
+describe('KanbanBoard column ordering', () => {
+  it('reorders the bays, carrying each column cards with it', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    expect(bayOrder()).toEqual(['Backlog column', 'To Do column', 'In Progress column', 'Done column']);
+
+    await user.click(screen.getByRole('button', { name: 'Move To Do column right' }));
+
+    expect(bayOrder()).toEqual(['Backlog column', 'In Progress column', 'To Do column', 'Done column']);
+    const toDo = within(screen.getByLabelText('To Do column')).getAllByRole('group');
+    expect(toDo.map((strip) => strip.getAttribute('aria-label'))).toEqual([
+      'Plan weekly groceries',
+      'Book dentist appointment',
+      'Organize reading list',
+    ]);
+  });
+
+  it('disables the control that would move a column past the edge', async () => {
+    render(<KanbanBoard />);
+    await screen.findByLabelText('Backlog column');
+    expect(screen.getByRole('button', { name: 'Move Backlog column left' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Move Done column right' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Move Backlog column right' })).toBeEnabled();
+  });
+
+  it('reorders while a filter is active, because it is a structural change', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await user.type(await screen.findByLabelText('Search cards by title or description'), 'groceries');
+
+    await user.click(screen.getByRole('button', { name: 'Move To Do column right' }));
+
+    expect(bayOrder()).toEqual(['Backlog column', 'In Progress column', 'To Do column', 'Done column']);
+  });
+});

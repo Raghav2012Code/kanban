@@ -1,4 +1,4 @@
-import type { BoardState, CardItem, PriorityFilter } from '../types/kanban';
+import type { BoardState, CardDraft, CardItem, PriorityFilter } from '../types/kanban';
 
 export interface MoveCardOptions {
   positional?: boolean;
@@ -57,6 +57,44 @@ export function removeCard(state: BoardState, cardId: string): BoardState {
 export function addCard(state: BoardState, columnId: string, card: CardItem): BoardState {
   if (state.cards[card.id] || !state.columns.some((column) => column.id === columnId)) return state;
   return { cards: { ...state.cards, [card.id]: card }, columns: state.columns.map((column) => (column.id === columnId ? { ...column, cardIds: [...column.cardIds, card.id] } : column)) };
+}
+
+/**
+ * Editing shares the draft type, the normalisation, and the validation with
+ * creation, so the two paths cannot drift. Only the content changes: identity,
+ * column membership, position, and the filed date are all carried across, so
+ * correcting a card never falsifies its history or quietly reorders the board.
+ */
+export function updateCard(state: BoardState, cardId: string, draft: CardDraft): BoardState {
+  const existing = state.cards[cardId];
+  if (!existing) return state;
+  const updated: CardItem = {
+    id: existing.id,
+    title: draft.title,
+    priority: draft.priority,
+    createdAt: existing.createdAt,
+    ...(draft.description ? { description: draft.description } : {}),
+    ...(draft.dueDate ? { dueDate: draft.dueDate } : {}),
+  };
+  return { ...state, cards: { ...state.cards, [cardId]: updated } };
+}
+
+/**
+ * Column order is board structure rather than a card concern, so it is its own
+ * transition rather than an option on the card move. The column's cards travel
+ * with it untouched: reordering a column is not secretly a bulk move.
+ */
+export function moveColumnToAdjacent(state: BoardState, columnId: string, direction: 'left' | 'right'): BoardState {
+  const index = state.columns.findIndex((column) => column.id === columnId);
+  if (index < 0) return state;
+  const target = direction === 'left' ? index - 1 : index + 1;
+  if (target < 0 || target >= state.columns.length) return state;
+
+  const columns = state.columns.slice();
+  const [moved] = columns.splice(index, 1);
+  if (!moved) return state;
+  columns.splice(target, 0, moved);
+  return { ...state, columns };
 }
 
 export function resolveInsertAfter(clientY: number, top: number, height: number): boolean {

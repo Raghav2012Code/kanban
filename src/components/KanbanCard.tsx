@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { IconAlertTriangle, IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowUp, IconChevronDown, IconChevronUp, IconGripVertical, IconTrash } from '@tabler/icons-react';
+import { IconAlertTriangle, IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowUp, IconChevronDown, IconChevronUp, IconGripVertical, IconPencil, IconTrash } from '@tabler/icons-react';
 import type { DragEvent } from 'react';
 import { useMotionTransition } from '@/hooks/useMotionTransition';
 import { formatDueDate } from '@/lib/dates';
@@ -21,6 +21,7 @@ interface KanbanCardProps {
   canMoveLeft: boolean;
   canMoveRight: boolean;
   onDelete: (id: string) => void;
+  onEdit: (id: string) => void;
   onToggleExpanded: (id: string) => void;
   onMove: (id: string, direction: MoveDirection) => void;
   onDragStart: (event: DragEvent<HTMLElement>, id: string) => void;
@@ -44,7 +45,7 @@ const moveControls: { direction: MoveDirection; label: string; Icon: typeof Icon
   { direction: 'right', label: 'to the next column', Icon: IconArrowRight, can: 'canMoveRight' },
 ];
 
-export function KanbanCard({ card, done, overdue, expanded, canMoveUp, canMoveDown, canMoveLeft, canMoveRight, onDelete, onToggleExpanded, onMove, onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop, dropIndicator }: KanbanCardProps): JSX.Element {
+export function KanbanCard({ card, done, overdue, expanded, canMoveUp, canMoveDown, canMoveLeft, canMoveRight, onDelete, onEdit, onToggleExpanded, onMove, onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop, dropIndicator }: KanbanCardProps): JSX.Element {
   const transition = useMotionTransition();
   const canMove = { canMoveUp, canMoveDown, canMoveLeft, canMoveRight };
   const rail = done ? 'bg-cleared' : overdue ? 'bg-hold' : 'bg-line-strong';
@@ -74,6 +75,7 @@ export function KanbanCard({ card, done, overdue, expanded, canMoveUp, canMoveDo
       </div>
       <div className={cn('flex items-center justify-end gap-0.5', '[@media(hover:hover)]:absolute [@media(hover:hover)]:right-1.5 [@media(hover:hover)]:top-1.5 [@media(hover:hover)]:rounded-strip [@media(hover:hover)]:border [@media(hover:hover)]:border-line [@media(hover:hover)]:bg-raised [@media(hover:hover)]:px-0.5', revealControl)}>
         {moveControls.map(({ direction, label, Icon, can }) => <Button key={direction} variant="ghost" size="icon" onClick={() => onMove(card.id, direction)} disabled={!canMove[can]} aria-label={`Move ${card.title} ${label}`} className="h-7 w-7 text-faint"><Icon size={14} stroke={1.5} /></Button>)}
+        <Button variant="ghost" size="icon" onClick={() => onEdit(card.id)} aria-label={`Edit ${card.title}`} className="h-7 w-7 text-faint"><IconPencil size={14} stroke={1.5} /></Button>
         <Button variant="destructive" size="icon" onClick={() => onDelete(card.id)} aria-label={`Delete ${card.title}`} className="h-7 w-7"><IconTrash size={14} stroke={1.5} /></Button>
       </div>
     </motion.div>

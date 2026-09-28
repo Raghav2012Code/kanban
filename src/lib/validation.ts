@@ -1,5 +1,5 @@
 import { isValidDateString, localDateString } from './dates';
-import type { CardDraft } from '../types/kanban';
+import type { CardDraft, CardItem } from '../types/kanban';
 
 export type DueDateStatus = 'valid' | 'empty' | 'invalid' | 'past';
 
@@ -25,5 +25,15 @@ export function normalizeCardDraft(draft: CardDraft, today = localDateString()):
       draft: { ...draft, title: draft.title.trim(), description: draft.description.trim() },
       requiresPastConfirmation: status === 'past',
     },
+  };
+}
+
+/** The inverse of normalisation: opens an edit pre-filled with the card's truth, not a blank. */
+export function cardToDraft(card: CardItem): CardDraft {
+  return {
+    title: card.title,
+    priority: card.priority,
+    dueDate: card.dueDate ?? '',
+    description: card.description ?? '',
   };
 }

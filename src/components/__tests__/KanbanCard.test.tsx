@@ -18,6 +18,7 @@ function renderCard(overrides: Partial<ComponentProps<typeof KanbanCard>> = {}) 
     canMoveLeft: true,
     canMoveRight: true,
     onDelete: vi.fn(),
+    onEdit: vi.fn(),
     onToggleExpanded: vi.fn(),
     onMove: vi.fn(),
     onDragStart: vi.fn(),

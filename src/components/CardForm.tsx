@@ -11,13 +11,18 @@ import { Textarea } from '@/components/ui/textarea';
 
 const emptyDraft: CardDraft = { title: '', priority: 'medium', dueDate: '', description: '' };
 
+export type CardFormMode = 'file' | 'edit';
+
 interface CardFormProps {
   onSave: (draft: CardDraft) => void;
   onCancel: () => void;
+  /** Present when editing: the form opens on the card's truth rather than a blank. */
+  initialDraft?: CardDraft;
+  mode?: CardFormMode;
 }
 
-export function CardForm({ onSave, onCancel }: CardFormProps): JSX.Element {
-  const [draft, setDraft] = useState<CardDraft>(emptyDraft);
+export function CardForm({ onSave, onCancel, initialDraft, mode = 'file' }: CardFormProps): JSX.Element {
+  const [draft, setDraft] = useState<CardDraft>(() => initialDraft ?? emptyDraft);
   const [error, setError] = useState<string | null>(null);
   const [pastConfirmed, setPastConfirmed] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -33,7 +38,13 @@ export function CardForm({ onSave, onCancel }: CardFormProps): JSX.Element {
     if (result.value.requiresPastConfirmation && !pastConfirmed) { setPastConfirmed(true); setError('This due date is in the past. Save again to confirm.'); return; }
     onSave(result.value.draft);
   };
-  return <motion.form initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={transition} onSubmit={submit} onKeyDown={(event: KeyboardEvent<HTMLFormElement>) => { if (event.key === 'Escape') onCancel(); }} className="space-y-2.5 overflow-hidden rounded-strip border border-line bg-surface p-3">
+  const editing = mode === 'edit';
+  // The caption and the submit label are what keep an edit from reading as a
+  // second card being filed, so the two paths cannot be confused at a glance.
+  const caption = editing ? 'Edit card' : 'File card';
+  const submitLabel = editing ? 'Save changes' : 'Save card';
+  return <motion.form aria-label={caption} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={transition} onSubmit={submit} onKeyDown={(event: KeyboardEvent<HTMLFormElement>) => { if (event.key === 'Escape') onCancel(); }} className="space-y-2.5 overflow-hidden rounded-strip border border-line bg-surface p-3">
+    <p className="font-mono text-[11px] uppercase leading-5 tracking-wide text-muted">{caption}</p>
     <div className="space-y-1"><label htmlFor="card-title" className="block font-mono text-[11px] uppercase tracking-wide text-muted">Card title</label><Input id="card-title" ref={titleRef} value={draft.title} onChange={(event) => update({ title: event.target.value })} aria-label="Card title" /></div>
     <div className="grid grid-cols-2 gap-2">
       <div className="space-y-1"><label htmlFor="card-priority" className="block font-mono text-[11px] uppercase tracking-wide text-muted">Priority</label><Select id="card-priority" value={draft.priority} onChange={(event) => update({ priority: event.target.value as CardDraft['priority'] })} aria-label="Priority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></Select></div>
@@ -41,6 +52,6 @@ export function CardForm({ onSave, onCancel }: CardFormProps): JSX.Element {
     </div>
     <div className="space-y-1"><label htmlFor="card-notes" className="block font-mono text-[11px] uppercase tracking-wide text-muted">Description (optional)</label><Textarea id="card-notes" value={draft.description} onChange={(event) => update({ description: event.target.value })} aria-label="Description" rows={3} /></div>
     {error && <p role="alert" className="font-mono text-[11px] uppercase leading-5 tracking-wide text-warn">{error}</p>}
-    <div className="flex justify-end gap-2"><Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button><Button type="submit" size="sm">{pastConfirmed && pastDate ? 'Save anyway' : 'Save card'}</Button></div>
+    <div className="flex justify-end gap-2"><Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button><Button type="submit" size="sm">{pastConfirmed && pastDate ? 'Save anyway' : submitLabel}</Button></div>
   </motion.form>;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { addCard, isFilterActive, moveCard, moveCardToAdjacentColumn, moveCardWithinColumn, pruneExpandedIds, removeCard, resolveInsertAfter } from '../board';
-import type { BoardState, CardItem } from '../../types/kanban';
+import { addCard, isFilterActive, moveCard, moveCardToAdjacentColumn, moveCardWithinColumn, moveColumnToAdjacent, pruneExpandedIds, removeCard, resolveInsertAfter, updateCard } from '../board';
+import type { BoardState, CardDraft, CardItem } from '../../types/kanban';
 
 function board(): BoardState {
   return {
@@ -108,6 +108,81 @@ describe('addCard', () => {
     const state = board();
     expect(addCard(state, 'col-2', { ...card, id: 'a' })).toBe(state);
     expect(addCard(state, 'missing', card)).toBe(state);
+  });
+});
+
+describe('updateCard', () => {
+  const draft = (patch: Partial<CardDraft> = {}): CardDraft => ({
+    title: 'A revised',
+    priority: 'high',
+    dueDate: '2026-10-01',
+    description: 'A new note',
+    ...patch,
+  });
+
+  it('replaces the card contents from the draft', () => {
+    const updated = updateCard(board(), 'b', draft());
+    expect(updated.cards.b).toEqual({
+      id: 'b',
+      title: 'A revised',
+      priority: 'high',
+      createdAt: 2,
+      description: 'A new note',
+      dueDate: '2026-10-01',
+    });
+  });
+
+  it('preserves the card identity, its filed date, and its position in the column', () => {
+    const updated = updateCard(board(), 'b', draft());
+    expect(updated.cards.b.id).toBe('b');
+    expect(updated.cards.b.createdAt).toBe(2);
+    expect(ids(updated, 'col-1')).toEqual(['a', 'b', 'e']);
+  });
+
+  it('leaves every other card untouched', () => {
+    const before = board();
+    const updated = updateCard(before, 'b', draft());
+    expect(updated.cards.a).toBe(before.cards.a);
+    expect(ids(updated, 'col-2')).toEqual(['c', 'd']);
+  });
+
+  it('drops the due date and description when the draft clears them', () => {
+    const state = board();
+    state.cards.c = { id: 'c', title: 'C', priority: 'low', createdAt: 3, dueDate: '2026-01-01', description: 'note' };
+    const updated = updateCard(state, 'c', draft({ dueDate: '', description: '' }));
+    expect(updated.cards.c.dueDate).toBeUndefined();
+    expect(updated.cards.c.description).toBeUndefined();
+  });
+
+  it('is a no-op for an unknown card', () => {
+    const state = board();
+    expect(updateCard(state, 'missing', draft())).toBe(state);
+  });
+});
+
+describe('moveColumnToAdjacent', () => {
+  const titles = (state: BoardState) => state.columns.map((column) => column.title);
+
+  it('moves a column one slot left or right', () => {
+    expect(titles(moveColumnToAdjacent(board(), 'col-2', 'left'))).toEqual(['Two', 'One']);
+    expect(titles(moveColumnToAdjacent(board(), 'col-1', 'right'))).toEqual(['Two', 'One']);
+  });
+
+  it('carries the column cards with it, leaving their order inside untouched', () => {
+    const moved = moveColumnToAdjacent(board(), 'col-2', 'left');
+    expect(ids(moved, 'col-2')).toEqual(['c', 'd']);
+    expect(ids(moved, 'col-1')).toEqual(['a', 'b', 'e']);
+  });
+
+  it('is a no-op at the outer columns', () => {
+    const state = board();
+    expect(moveColumnToAdjacent(state, 'col-1', 'left')).toBe(state);
+    expect(moveColumnToAdjacent(state, 'col-2', 'right')).toBe(state);
+  });
+
+  it('is a no-op for an unknown column', () => {
+    const state = board();
+    expect(moveColumnToAdjacent(state, 'missing', 'left')).toBe(state);
   });
 });
 
