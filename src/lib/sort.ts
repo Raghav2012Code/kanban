@@ -1,5 +1,5 @@
 import type { BoardState, CardItem, SortMode } from '../types/kanban';
-import { dayNumberFromString } from './dates';
+import { dayNumber } from './dates';
 
 /**
  * Sorting is a read of the board, not an edit of it.
@@ -9,10 +9,6 @@ import { dayNumberFromString } from './dates';
  * filter: looking at the board in a different order cannot change the board.
  */
 
-function filedTime(card: CardItem): number {
-  return card.createdAt;
-}
-
 /**
  * Undated cards are placed consistently rather than left in an incidental order,
  * so a sorted column is reproducible. They sort after every dated card, and ties
@@ -20,12 +16,11 @@ function filedTime(card: CardItem): number {
  * renders the same way.
  */
 function compareBy(criterion: Exclude<SortMode, 'manual'>): (a: CardItem, b: CardItem) => number {
+  // A due-date sort measures the deadline, which a card may not have; a filed-date
+  // sort measures a value every card has. `null` means "no deadline", and only the
+  // due-date sort can produce it.
   const measure = (card: CardItem): number | null =>
-    criterion === 'dueDate'
-      ? card.dueDate
-        ? dayNumberFromString(card.dueDate)
-        : null
-      : filedTime(card);
+    criterion === 'dueDate' ? (card.dueDate ? dayNumber(card.dueDate) : null) : card.createdAt;
 
   return (a, b) => {
     const left = measure(a);

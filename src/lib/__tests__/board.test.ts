@@ -158,6 +158,16 @@ describe('updateCard', () => {
     const state = board();
     expect(updateCard(state, 'missing', draft())).toBe(state);
   });
+
+  it('cannot introduce a duplicate card, because the id is not the draft to set', () => {
+    // The add path guards a duplicate by rejecting a card whose id already exists.
+    // Update has no such hazard by construction: the target id is chosen by the
+    // caller and the draft carries content only, so an edit cannot mint a new card.
+    const state = board();
+    const after = updateCard(state, 'b', draft());
+    expect(Object.keys(after.cards).sort()).toEqual(Object.keys(state.cards).sort());
+    expect(after.cards.b.title).toBe('A revised');
+  });
 });
 
 describe('moveColumnToAdjacent', () => {

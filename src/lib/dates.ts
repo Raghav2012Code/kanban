@@ -22,14 +22,10 @@ export function addDays(date: Date, days: number): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 }
 
+/** Days since the epoch for a YYYY-MM-DD, so two date-only values compare directly. */
 export function dayNumber(value: string): number {
   const [year, month, day] = value.split('-').map(Number);
   return Date.UTC(year, month - 1, day) / 86_400_000;
-}
-
-/** Days since the epoch, for a validated YYYY-MM-DD. Named for callers outside this module. */
-export function dayNumberFromString(value: string): number {
-  return dayNumber(value);
 }
 
 /**

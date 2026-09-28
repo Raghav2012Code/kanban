@@ -5,13 +5,12 @@ export interface MoveCardOptions {
 }
 
 /**
- * Whether a column is already carrying as much as its Work In Progress limit
- * allows. A column with no limit set is unrestricted, so limits stay opt-in and a
- * stale number can always be cleared.
+ * Whether a column cannot take `incoming` more cards.
  *
- * `incoming` is how many cards are about to land. A bulk move is checked in
- * advance, so moving five cards into a column with two free slots is refused in
- * full rather than accepted and then silently overfilling the column.
+ * Named for the question it answers rather than for the state it detects, because
+ * there are two closely related questions and conflating them inverts a check:
+ * `isColumnAtLimit` asks whether a move would exceed the limit, while
+ * `isColumnOverLimit` asks whether the column already is over it.
  */
 export function isColumnAtLimit(column: ColumnItem, incoming = 1): boolean {
   return column.limit !== undefined && column.cardIds.length + incoming > column.limit;
@@ -85,11 +84,18 @@ export function moveCardsInto(state: BoardState, cardIds: string[], targetColumn
   return arriving.reduce((current, cardId) => moveCard(current, cardId, targetColumnId), state);
 }
 
+/** The index one slot in `direction`, or undefined at the outer boundary. */
+function adjacentIndex(count: number, index: number, direction: 'left' | 'right'): number | undefined {
+  const target = direction === 'left' ? index - 1 : index + 1;
+  return target < 0 || target >= count ? undefined : target;
+}
+
 /** The column a card would land in, so a caller can explain a refusal before attempting it. */
 export function adjacentColumnOf(state: BoardState, cardId: string, direction: 'left' | 'right'): ColumnItem | undefined {
   const index = state.columns.findIndex((column) => column.cardIds.includes(cardId));
   if (index < 0) return undefined;
-  return state.columns[direction === 'left' ? index - 1 : index + 1];
+  const target = adjacentIndex(state.columns.length, index, direction);
+  return target === undefined ? undefined : state.columns[target];
 }
 
 export function moveCardWithinColumn(state: BoardState, cardId: string, direction: 'up' | 'down'): BoardState {  const column = state.columns.find((item) => item.cardIds.includes(cardId));
@@ -103,9 +109,10 @@ export function moveCardWithinColumn(state: BoardState, cardId: string, directio
 export function moveCardToAdjacentColumn(state: BoardState, cardId: string, direction: 'left' | 'right'): BoardState {
   const columnIndex = state.columns.findIndex((column) => column.cardIds.includes(cardId));
   if (columnIndex < 0) return state;
-  const targetIndex = direction === 'left' ? columnIndex - 1 : columnIndex + 1;
-  if (targetIndex < 0 || targetIndex >= state.columns.length) return state;
-  return moveCard(state, cardId, state.columns[targetIndex].id);
+  const targetIndex = adjacentIndex(state.columns.length, columnIndex, direction);
+  if (targetIndex === undefined) return state;
+  const targetColumn = state.columns[targetIndex];
+  return targetColumn ? moveCard(state, cardId, targetColumn.id) : state;
 }
 
 export function removeCard(state: BoardState, cardId: string): BoardState {
@@ -148,8 +155,8 @@ export function updateCard(state: BoardState, cardId: string, draft: CardDraft):
 export function moveColumnToAdjacent(state: BoardState, columnId: string, direction: 'left' | 'right'): BoardState {
   const index = state.columns.findIndex((column) => column.id === columnId);
   if (index < 0) return state;
-  const target = direction === 'left' ? index - 1 : index + 1;
-  if (target < 0 || target >= state.columns.length) return state;
+  const target = adjacentIndex(state.columns.length, index, direction);
+  if (target === undefined) return state;
 
   const columns = state.columns.slice();
   const [moved] = columns.splice(index, 1);

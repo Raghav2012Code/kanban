@@ -45,6 +45,7 @@ export default function KanbanBoard(): JSX.Element {
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [dueWithinDays, setDueWithinDays] = useState<number | null>(null);
   const [columnTitle, setColumnTitle] = useState('');
+  const [filedWithinDays, setFiledWithinDays] = useState<number | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [activeFormColumn, setActiveFormColumn] = useState<string | null>(null);
   const [addingColumn, setAddingColumn] = useState(false);
@@ -79,8 +80,8 @@ export default function KanbanBoard(): JSX.Element {
   }, [undo, redo]);
 
   const criteria = useMemo<FilterCriteria>(
-    () => ({ query: search, priority: priorityFilter, overdueOnly, dueWithinDays, columnTitle }),
-    [search, priorityFilter, overdueOnly, dueWithinDays, columnTitle],
+    () => ({ query: search, priority: priorityFilter, overdueOnly, dueWithinDays, columnTitle, filedWithinDays }),
+    [search, priorityFilter, overdueOnly, dueWithinDays, columnTitle, filedWithinDays],
   );
   // One gate for the positional-reorder rule, and it counts a sort as well as a
   // filter, because a sorted column has the same hazard a filtered one does.
@@ -108,9 +109,21 @@ export default function KanbanBoard(): JSX.Element {
       announce(limitRefusal(target));
       return;
     }
-    // Named explicitly, because "done" is not a confirmation a person can act on.
-    const names = ids.map((id) => board.cards[id]?.title).filter(Boolean);
-    announce(`Moved ${arriving.length} card${arriving.length === 1 ? '' : 's'} to ${target.title}: ${names.join(', ')}.`);
+    if (arriving.length === 0) {
+      // Nothing is moving, so there is nothing to announce. Saying "Moved 0 cards"
+      // would be a claim about work that did not happen.
+      announce(null);
+      setSelectedIds(new Set());
+      return;
+    }
+    // Announced off the resulting board, and only for cards that actually moved.
+    const moved = moveCardsInto(board, ids, targetColumnId);
+    const names = arriving.map((id) => board.cards[id]?.title).filter(Boolean);
+    announce(
+      moved === board
+        ? `Nothing moved: ${target.title} would go over its limit.`
+        : `Moved ${arriving.length} card${arriving.length === 1 ? '' : 's'} to ${target.title}: ${names.join(', ')}.`,
+    );
     updateBoard((current) => moveCardsInto(current, ids, targetColumnId));
     setSelectedIds(new Set());
   };
@@ -143,8 +156,14 @@ export default function KanbanBoard(): JSX.Element {
         ? moveCardWithinColumn(current, cardId, direction)
         : moveCardToAdjacentColumn(current, cardId, direction);
     const moved = transition(board);
+    if (moved === board) {
+      // The transition declined, so there is nothing to announce: claiming a move that
+      // did not happen is worse than saying nothing.
+      announce(null);
+      return;
+    }
     announce(describeMove(board, moved, cardId, direction));
-    updateBoard(transition);
+    updateBoard(() => moved);
   };
   const beginEditCard = (cardId: string) => { setEditingCardId(cardId); setActiveFormColumn(null); setAddingColumn(false); };
   const saveEditedCard = (cardId: string, draft: CardDraft) => { updateBoard((current) => updateCard(current, cardId, draft)); setEditingCardId(null); };
@@ -155,11 +174,21 @@ export default function KanbanBoard(): JSX.Element {
   const limitRefusal = (column: ColumnItem): string => `${column.title} is at its Work In Progress limit of ${column.limit}. Move or delete a card, or raise the limit, before moving one in.`;
   const beginLimit = (column: ColumnItem) => { setLimitingColumn(column.id); setLimitValue(column.limit === undefined ? '' : String(column.limit)); };
   // An empty or unusable value clears the limit, so a stale number is never permanent.
+  // Clearing is expressed by dropping the key rather than rebuilding the column, so a
+  // field added to a column later is not silently discarded here.
   const saveLimit = () => {
     if (!limitingColumn) return;
     const parsed = Number(limitValue);
     const limit = Number.isInteger(parsed) && parsed >= 0 && limitValue.trim() !== '' ? parsed : undefined;
-    updateBoard((current) => ({ ...current, columns: current.columns.map((column) => (column.id === limitingColumn ? (limit === undefined ? { id: column.id, title: column.title, cardIds: column.cardIds } : { ...column, limit }) : column)) }));
+    updateBoard((current) => ({
+      ...current,
+      columns: current.columns.map((column) => {
+        if (column.id !== limitingColumn) return column;
+        if (limit !== undefined) return { ...column, limit };
+        const { limit: _removed, ...rest } = column;
+        return rest;
+      }),
+    }));
     setLimitingColumn(null);
   };
   // Routed through the board's one existing notice channel rather than a second
@@ -169,6 +198,14 @@ export default function KanbanBoard(): JSX.Element {
     if (result === 'replaced') announce('Board imported.');
     else if (result === 'invalid') announce('That file is not a board, so nothing was changed.');
     else announce('That file could not be read as JSON, so nothing was changed.');
+  };
+  // Dragging onto a collapsed bay is refused rather than accepted into a hidden body,
+  // where the card would arrive invisibly and the drop would look like it worked.
+  const refuseDropOntoCollapsed = (columnId: string): boolean => {
+    if (!collapsedIds.has(columnId)) return false;
+    const column = board.columns.find((item) => item.id === columnId);
+    announce(`${column?.title ?? 'That column'} is collapsed. Expand it before dropping a card in.`);
+    return true;
   };
   const refuseIfAtLimit = (cardId: string, target: ColumnItem | undefined): boolean => {
     if (!target || !isColumnAtLimit(target)) return false;
@@ -181,7 +218,28 @@ export default function KanbanBoard(): JSX.Element {
   const handleDragStart = (event: DragEvent<HTMLElement>, cardId: string) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', cardId); setDraggedCardId(cardId); };
   const handleDragOver = (event: DragEvent<HTMLElement>, columnId: string, cardId?: string) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; if (!positionalEnabled || !cardId) { setDropTarget({ columnId }); return; } const rect = event.currentTarget.getBoundingClientRect(); setDropTarget({ columnId, cardId, insertAfter: resolveInsertAfter(event.clientY, rect.top, rect.height) }); };
   const handleDragLeave = (event: DragEvent<HTMLElement>) => { const related = event.relatedTarget; if (!(related instanceof Node) || !event.currentTarget.contains(related)) setDropTarget(null); };
-  const handleDrop = (event: DragEvent<HTMLElement>, columnId: string, cardId?: string) => { event.preventDefault(); const id = event.dataTransfer.getData('text/plain'); if (id && board.cards[id]) { if (refuseIfAtLimit(id, board.columns.find((column) => column.id === columnId))) { clearDrag(); return; } const anchorId = positionalEnabled ? cardId : undefined; let insertAfter = false; if (anchorId) { const rect = event.currentTarget.getBoundingClientRect(); insertAfter = resolveInsertAfter(event.clientY, rect.top, rect.height); } updateBoard((current) => moveCard(current, id, columnId, anchorId, insertAfter)); } clearDrag(); };
+  // A dropped card is announced exactly like an arrow-key move, because a drag is a
+  // move and a person who cannot see the drop happening needs the same confirmation.
+  const handleDrop = (event: DragEvent<HTMLElement>, columnId: string, cardId?: string) => {
+    event.preventDefault();
+    const id = event.dataTransfer.getData('text/plain');
+    if (id && board.cards[id]) {
+      if (refuseDropOntoCollapsed(columnId)) { clearDrag(); return; }
+      if (refuseIfAtLimit(id, board.columns.find((column) => column.id === columnId))) { clearDrag(); return; }
+      const anchorId = positionalEnabled ? cardId : undefined;
+      let insertAfter = false;
+      if (anchorId) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        insertAfter = resolveInsertAfter(event.clientY, rect.top, rect.height);
+      }
+      const moved = moveCard(board, id, columnId, anchorId, insertAfter);
+      const landed = moved.columns.find((column) => column.cardIds.includes(id));
+      const card = board.cards[id];
+      announce(landed && card ? `Moved ${card.title} to ${landed.title}, position ${landed.cardIds.indexOf(id) + 1} of ${landed.cardIds.length}.` : null);
+      updateBoard(() => moved);
+    }
+    clearDrag();
+  };
   const handleColumnDragOver = (event: DragEvent<HTMLElement>, columnId: string) => handleDragOver(event, columnId);
   const beginRename = (column: ColumnItem) => { setRenamingColumn(column.id); setRenameValue(column.title); setActiveFormColumn(null); };
 
@@ -190,13 +248,12 @@ export default function KanbanBoard(): JSX.Element {
   const selectionBar = selectedIds.size > 0 ? (
     <div className="flex items-center gap-1">
       <span className="font-mono text-[11px] uppercase tracking-wide text-muted">{selectedIds.size} selected</span>
-      {board.columns.map((column, index) => (
+      {board.columns.map((column) => (
         <Button
           key={column.id}
           variant="outline"
           size="sm"
           onClick={() => moveSelectedInto(column.id)}
-          disabled={index === board.columns.length - 1}
           aria-label={`Move ${selectedIds.size} selected cards to ${column.title}`}
           className="h-9 font-mono text-[11px] uppercase tracking-wide"
         >
@@ -208,6 +265,6 @@ export default function KanbanBoard(): JSX.Element {
       </Button>
     </div>
   ) : null;
-  return <div className="min-h-screen min-w-0 overflow-x-hidden bg-base pb-16 text-ink"><BoardHeader search={search} priorityFilter={priorityFilter} onSearchChange={setSearch} onPriorityChange={setPriorityFilter} overdueOnly={overdueOnly} onOverdueOnlyChange={setOverdueOnly} dueWithinDays={dueWithinDays} onDueWithinChange={setDueWithinDays} columnTitle={columnTitle} onColumnTitleChange={setColumnTitle} sort={sort} onSortChange={setSort} canUndo={canUndo} canRedo={canRedo} onUndo={undo} onRedo={redo} transfer={<BoardTransfer board={board} onReplace={replaceBoard} onResult={reportTransfer} />} selectionBar={selectionBar}
+  return <div className="min-h-screen min-w-0 overflow-x-hidden bg-base pb-16 text-ink"><BoardHeader search={search} priorityFilter={priorityFilter} onSearchChange={setSearch} onPriorityChange={setPriorityFilter} overdueOnly={overdueOnly} onOverdueOnlyChange={setOverdueOnly} dueWithinDays={dueWithinDays} onDueWithinChange={setDueWithinDays} columnTitle={columnTitle} onColumnTitleChange={setColumnTitle} filedWithinDays={filedWithinDays} onFiledWithinChange={setFiledWithinDays} sort={sort} onSortChange={setSort} canUndo={canUndo} canRedo={canRedo} onUndo={undo} onRedo={redo} transfer={<BoardTransfer board={board} onReplace={replaceBoard} onResult={reportTransfer} />} selectionBar={selectionBar}
  /><main className="mx-auto min-w-0 max-w-[1600px] px-4 py-5 sm:px-6 lg:px-10"><StorageNotice warning={storageWarning} onDismiss={dismissStorageWarning} />{columnNotice && <div role="status" aria-live="polite" className="mb-4 flex items-center justify-between gap-3 rounded-strip border border-line-strong bg-raised px-3 py-2 text-xs text-muted"><span className="min-w-0 flex-1 leading-5">{columnNotice}</span><Button variant="ghost" size="icon" onClick={() => setColumnNotice(null)} aria-label="Dismiss column notice" className="h-6 w-6"><IconX size={12} stroke={1.5} /></Button></div>}<motion.div layout transition={transition} className="min-w-0 overflow-x-auto" onDragLeave={handleDragLeave}><div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:gap-4"><AnimatePresence initial={false}>{board.columns.map((column, index) => <BoardColumn key={column.id} column={column} cards={renderedByColumn[column.id].map((id) => board.cards[id]).filter((card): card is NonNullable<typeof card> => Boolean(card))} activeForm={activeFormColumn === column.id} renaming={renamingColumn === column.id} renameValue={renameValue} draggedCardId={draggedCardId} dropTarget={dropTarget} positionalEnabled={positionalEnabled} canMoveLeft={index > 0} canMoveRight={index < board.columns.length - 1} onStartCardForm={() => { setActiveFormColumn(column.id); setAddingColumn(false); }} onSaveCard={(draft) => addCard(column.id, draft)} onCancelCardForm={() => setActiveFormColumn(null)} onBeginRename={() => beginRename(column)} onRenameChange={setRenameValue} onSaveRename={saveRename} onCancelRename={() => setRenamingColumn(null)} onDeleteColumn={() => requestDeleteColumn(column)} onDeleteCard={deleteCard} onEditCard={beginEditCard} editingCardId={editingCardId} onSaveCardDraft={saveEditedCard} onCancelEditCard={() => setEditingCardId(null)} onMoveColumn={(direction) => moveColumnTo(column.id, direction)} selectedIds={selectedIds} onToggleSelected={toggleSelected} collapsed={collapsedIds.has(column.id)} onToggleCollapsed={() => toggleCollapsed(column.id)} settingLimit={limitingColumn === column.id} limitValue={limitValue} onStartLimit={() => beginLimit(column)} onLimitChange={setLimitValue} onSaveLimit={saveLimit} onCancelLimit={() => setLimitingColumn(null)} onMove={moveCardTo} expandedIds={expandedIds} onToggleExpanded={(id) => setExpandedIds((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })} onDragStart={handleDragStart} onDragEnd={clearDrag} onDragOver={(event, id) => id ? handleDragOver(event, column.id, id) : handleColumnDragOver(event, column.id)} onDragEnter={(event, id) => id ? handleDragOver(event, column.id, id) : handleColumnDragOver(event, column.id)} onDragLeave={handleDragLeave} onDrop={(event, id) => handleDrop(event, column.id, id)} />)}{addingColumn ? <AddColumn value={newColumnTitle} inputRef={newColumnRef} onChange={setNewColumnTitle} onSave={saveColumn} onCancel={() => { setAddingColumn(false); setNewColumnTitle(''); }} /> : <Button variant="ghost" onClick={() => { setAddingColumn(true); setActiveFormColumn(null); }} className="w-full shrink-0 justify-start rounded-none px-4 py-4 font-mono text-[11px] uppercase tracking-wide text-muted lg:w-44 lg:px-5 lg:py-3"><IconCirclePlus size={14} stroke={1.5} /> Add bay</Button>}</AnimatePresence></div></motion.div></main><AnalyticsBar {...analytics} /></div>;
 }

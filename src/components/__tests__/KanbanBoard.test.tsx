@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import KanbanBoard from '../../KanbanBoard';
 import { COLLAPSED_COLUMNS_KEY, STORAGE_KEY } from '../../lib/constants';
@@ -83,9 +83,10 @@ describe('KanbanBoard filtered move safety', () => {
   }
 
   it.each([
-    ['the overdue dimension', async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole('button', { name: 'Overdue only' }))],
+    ['the overdue dimension', async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole('button', { name: 'Overdue only, off' }))],
     ['a due window', async (user: ReturnType<typeof userEvent.setup>) => user.selectOptions(screen.getByLabelText('Filter by due window'), '7')],
     ['a column title', async (user: ReturnType<typeof userEvent.setup>) => user.type(screen.getByLabelText('Filter by column title'), 'To Do')],
+    ['a filed window', async (user: ReturnType<typeof userEvent.setup>) => user.selectOptions(screen.getByLabelText('Filter by filed window'), '7')],
     ['a sort', async (user: ReturnType<typeof userEvent.setup>) => user.selectOptions(screen.getByLabelText('Sort cards'), 'dueDate')],
   ])('disables positional moves under %s, not just a text query', async (_label, apply) => {
     const user = userEvent.setup();
@@ -164,6 +165,16 @@ describe('KanbanBoard card deletion', () => {
 const bayOrder = (): (string | null)[] =>
   screen.getAllByRole('region').map((bay) => bay.getAttribute('aria-label'));
 
+/** The minimum surface a drop handler reads. jsdom has no real DataTransfer. */
+function makeDataTransfer(payload: string): DataTransfer {
+  return {
+    dropEffect: 'move',
+    effectAllowed: 'move',
+    getData: () => payload,
+    setData: () => undefined,
+  } as unknown as DataTransfer;
+}
+
 describe('KanbanBoard card editing', () => {
   it('edits a card in place, preserving its slot and its filed date', async () => {
     const user = userEvent.setup();
@@ -205,6 +216,49 @@ describe('KanbanBoard card editing', () => {
     await user.click(within(todo).getByRole('button', { name: 'File card' }));
     expect(await screen.findByRole('form', { name: 'File card' })).toBeInTheDocument();
     expect(screen.queryByRole('form', { name: 'Edit card' })).not.toBeInTheDocument();
+  });
+
+  it('submits an edit with Enter and abandons one with Escape', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+
+    const group = await screen.findByRole('group', { name: 'Plan weekly groceries' });
+    await user.click(within(group).getByRole('button', { name: 'Edit Plan weekly groceries' }));
+    const form = await screen.findByRole('form', { name: 'Edit card' });
+    await user.clear(within(form).getByLabelText('Card title'));
+    await user.type(within(form).getByLabelText('Card title'), 'Enter saves this{Enter}');
+
+    expect(await screen.findByRole('group', { name: 'Enter saves this' })).toBeInTheDocument();
+
+    // And Escape abandons, the same key the rename and limit fields already use.
+    const again = screen.getByRole('group', { name: 'Enter saves this' });
+    await user.click(within(again).getByRole('button', { name: 'Edit Enter saves this' }));
+    const second = await screen.findByRole('form', { name: 'Edit card' });
+    await user.clear(within(second).getByLabelText('Card title'));
+    await user.type(within(second).getByLabelText('Card title'), 'Never saved{Escape}');
+
+    expect(await screen.findByRole('group', { name: 'Enter saves this' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Never saved' })).not.toBeInTheDocument();
+  });
+
+  it('requires the same past-date confirmation when editing as when filing', async () => {
+    const user = userEvent.setup();
+    const past = localDateString(addDays(new Date(), -3));
+    render(<KanbanBoard />);
+
+    const group = await screen.findByRole('group', { name: 'Plan weekly groceries' });
+    await user.click(within(group).getByRole('button', { name: 'Edit Plan weekly groceries' }));
+    const form = await screen.findByRole('form', { name: 'Edit card' });
+    await user.clear(within(form).getByLabelText('Due date'));
+    await user.type(within(form).getByLabelText('Due date'), past);
+    await user.click(within(form).getByRole('button', { name: 'Save changes' }));
+
+    // Backdating needs the same explicit second press as filing does.
+    expect(await screen.findByText(/this due date is in the past/i)).toBeInTheDocument();
+    expect(within(form).getByRole('button', { name: 'Save anyway' })).toBeInTheDocument();
+
+    await user.click(within(form).getByRole('button', { name: 'Save anyway' }));
+    expect(await screen.findByRole('group', { name: 'Plan weekly groceries' })).toBeInTheDocument();
   });
 
   it('abandons an edit without saving', async () => {
@@ -380,7 +434,7 @@ describe('KanbanBoard filtering and sorting', () => {
     render(<KanbanBoard />);
     await screen.findByLabelText('Backlog column');
 
-    await user.click(screen.getByRole('button', { name: 'Overdue only' }));
+    await user.click(screen.getByRole('button', { name: 'Overdue only, off' }));
 
     expect(stripNamesIn('Backlog column')).toEqual(['Research personal finance apps']);
     expect(stripNamesIn('To Do column')).toEqual([]);
@@ -407,8 +461,26 @@ describe('KanbanBoard filtering and sorting', () => {
     expect(stripNamesIn('To Do column')).toEqual(['Organize reading list']);
   });
 
-  it('finds cards by their column title', async () => {
+  it('filters to cards filed inside the chosen window', async () => {
     const user = userEvent.setup();
+    const today = new Date();
+    const filedToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 8).getTime();
+    const filedLongAgo = new Date(2020, 0, 1).getTime();
+    seed((board) => {
+      board.cards['card-books'] = { ...board.cards['card-books'], createdAt: filedToday };
+      board.cards['card-groceries'] = { ...board.cards['card-groceries'], createdAt: filedLongAgo };
+      board.cards['card-dentist'] = { ...board.cards['card-dentist'], createdAt: filedLongAgo };
+    });
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await user.selectOptions(screen.getByLabelText('Filter by filed window'), '7');
+
+    // The filed dimension is a filter in its own right, not only a sort key.
+    expect(stripNamesIn('To Do column')).toEqual(['Organize reading list']);
+  });
+
+  it('finds cards by their column title', async () => {    const user = userEvent.setup();
     render(<KanbanBoard />);
     await screen.findByLabelText('To Do column');
 
@@ -785,7 +857,40 @@ describe('KanbanBoard column collapse', () => {
     expect(await within(todo).findByRole('group', { name: 'Plan weekly groceries' })).toBeInTheDocument();
   });
 
-  it('remembers a collapsed column across a reload, without touching the board', async () => {
+  it('refuses a drop onto a collapsed bay rather than hiding the card in it', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    const todo = await screen.findByLabelText('To Do column');
+    await user.click(within(todo).getByRole('button', { name: 'Collapse To Do column' }));
+
+    // Simulated rather than a real drag: jsdom cannot produce a trusted HTML5 drag,
+    // and what is under test is the refusal, not the browser's drag machinery.
+    const strip = screen.getByRole('group', { name: 'Prepare laundry schedule' });
+    fireEvent.dragStart(strip, { dataTransfer: makeDataTransfer('card-laundry') });
+    fireEvent.drop(todo, { dataTransfer: makeDataTransfer('card-laundry') });
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/collapsed/i);
+    // The card stayed where it was, rather than arriving invisibly.
+    const progress = within(screen.getByLabelText('In Progress column'))
+      .queryAllByRole('group')
+      .map((entry) => entry.getAttribute('aria-label'));
+    expect(progress).toContain('Prepare laundry schedule');
+  });
+
+  it('announces a dropped card, because a drag is a move too', async () => {
+    render(<KanbanBoard />);
+    const todo = await screen.findByLabelText('To Do column');
+    const strip = screen.getByRole('group', { name: 'Prepare laundry schedule' });
+
+    fireEvent.dragStart(strip, { dataTransfer: makeDataTransfer('card-laundry') });
+    fireEvent.drop(todo, { dataTransfer: makeDataTransfer('card-laundry') });
+
+    // Someone who cannot see the drop happen needs the same confirmation an arrow-key
+    // move gives them.
+    expect(await screen.findByRole('status')).toHaveTextContent(/moved prepare laundry schedule to to do/i);
+  });
+
+  it('stays collapsed across reloads, without touching the board', async () => {
     const user = userEvent.setup();
     const { unmount } = render(<KanbanBoard />);
     const todo = await screen.findByLabelText('To Do column');
@@ -891,6 +996,21 @@ describe('KanbanBoard bulk move', () => {
     expect(stripNamesIn('Backlog column')).toEqual(['Research personal finance apps', 'Set up photo backup']);
     expect(stripNamesIn('To Do column')).toEqual(todoBefore);
     expect(await screen.findByRole('status')).toHaveTextContent(/at its Work In Progress limit of 2/i);
+  });
+
+  it('can bulk-move into the final bay, because that is where a queue gets cleared', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await user.click(screen.getByRole('checkbox', { name: 'Select Plan weekly groceries' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Organize reading list' }));
+    // The last bay is a real destination. Clearing a queue usually means emptying it
+    // into Done, so the control a person actually wants must not be the dead one.
+    await user.click(screen.getByRole('button', { name: 'Move 2 selected cards to Done' }));
+
+    expect(stripNamesIn('To Do column')).toEqual(['Book dentist appointment']);
+    expect(stripNamesIn('Done column')).toEqual(['Archive tax documents', 'Plan weekly groceries', 'Organize reading list']);
   });
 
   it('clears a selection without moving anything', async () => {

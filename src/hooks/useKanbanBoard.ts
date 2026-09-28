@@ -25,8 +25,8 @@ export interface UseKanbanBoardResult {
   redo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-  /** Replaces the board wholesale, used by import. Recorded, so it is undoable. */
-  replaceBoard: (next: BoardState) => void;
+  /** Writes the board wholesale, as a recorded mutation. Used by import. */
+  replaceBoard: (updater: (current: BoardState) => BoardState) => void;
   storageWarning: StorageWarning | null;
   dismissStorageWarning: () => void;
 }
@@ -87,13 +87,6 @@ export function useKanbanBoard(): UseKanbanBoardResult {
     });
   }, []);
 
-  // Import writes the board wholesale, so it is a mutation like any other and is
-  // undoable. Validity is checked before anything is written, which means a
-  // rejected import leaves the current board exactly as it was.
-  const replaceBoard = useCallback((next: BoardState) => {
-    mutate(() => next);
-  }, [mutate]);
-
   const dismissStorageWarning = useCallback(() => {
     setStorageWarning((current) => {
       if (current) dismissedKinds.current.add(current.kind);
@@ -108,7 +101,7 @@ export function useKanbanBoard(): UseKanbanBoardResult {
     redo,
     canUndo: state.past.length > 0,
     canRedo: state.future.length > 0,
-    replaceBoard,
+    replaceBoard: mutate,
     storageWarning,
     dismissStorageWarning,
   };

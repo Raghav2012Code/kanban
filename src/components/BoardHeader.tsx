@@ -4,6 +4,7 @@ import type { PriorityFilter, SortMode } from '../types/kanban';
 import { BoardMark } from '@/components/BoardMark';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import { Select } from '@/components/ui/select';
 
 const DUE_WINDOWS: Array<{ value: number | null; label: string }> = [
@@ -11,6 +12,12 @@ const DUE_WINDOWS: Array<{ value: number | null; label: string }> = [
   { value: 3, label: 'Due in 3 days' },
   { value: 7, label: 'Due this week' },
   { value: 30, label: 'Due this month' },
+];
+
+const FILED_WINDOWS: Array<{ value: number | null; label: string }> = [
+  { value: null, label: 'Any filed date' },
+  { value: 7, label: 'Filed this week' },
+  { value: 30, label: 'Filed this month' },
 ];
 
 interface BoardHeaderProps {
@@ -24,6 +31,8 @@ interface BoardHeaderProps {
   onDueWithinChange: (value: number | null) => void;
   columnTitle: string;
   onColumnTitleChange: (value: string) => void;
+  filedWithinDays: number | null;
+  onFiledWithinChange: (value: number | null) => void;
   sort: SortMode;
   onSortChange: (value: SortMode) => void;
   canUndo: boolean;
@@ -46,6 +55,8 @@ export function BoardHeader({
   onDueWithinChange,
   columnTitle,
   onColumnTitleChange,
+  filedWithinDays,
+  onFiledWithinChange,
   sort,
   onSortChange,
   canUndo,
@@ -107,20 +118,34 @@ export function BoardHeader({
             ))}
           </Select>
 
+          <Select
+            value={filedWithinDays === null ? '' : String(filedWithinDays)}
+            onChange={(event) => onFiledWithinChange(event.target.value === '' ? null : Number(event.target.value))}
+            aria-label="Filter by filed window"
+            className="h-9"
+          >
+            {FILED_WINDOWS.map((option) => (
+              <option key={String(option.value)} value={option.value === null ? '' : String(option.value)}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+
           <Select value={sort} onChange={(event) => onSortChange(event.target.value as SortMode)} aria-label="Sort cards" className="h-9">
             <option value="manual">Manual order</option>
             <option value="dueDate">Sort by due date</option>
             <option value="filedDate">Sort by filed date</option>
           </Select>
 
-          {/* The state is in the accessible name, not only in the styling, so the
-              dimension is readable without perceiving the accent. */}
+          {/* The state is in `aria-pressed` and in the accessible name, so the
+              dimension is readable without perceiving the accent. Outline rather than
+              the accent fill when on: the board has one primary, and this is a filter. */}
           <Button
-            variant={overdueOnly ? 'default' : 'outline'}
+            variant="outline"
             onClick={() => onOverdueOnlyChange(!overdueOnly)}
             aria-pressed={overdueOnly}
-            aria-label="Overdue only"
-            className="h-9 font-mono text-[11px] uppercase tracking-wide"
+            aria-label={overdueOnly ? 'Overdue only, on' : 'Overdue only, off'}
+            className={cn('h-9 font-mono text-[11px] uppercase tracking-wide', overdueOnly && 'border-accent text-accent')}
           >
             Overdue
           </Button>

@@ -76,19 +76,32 @@ describe('isVisibleCard', () => {
 
   it('admits only overdue cards when the overdue dimension is set', () => {
     const overdue = criteria({ overdueOnly: true });
-    expect(isVisibleCard(board().cards.b, overdue, false, TODAY)).toBe(true);
-    expect(isVisibleCard(board().cards.c, overdue, false, TODAY)).toBe(false);
+    expect(isVisibleCard(board().cards.b, overdue, { today: TODAY })).toBe(true);
+    expect(isVisibleCard(board().cards.c, overdue, { today: TODAY })).toBe(false);
   });
 
   it('never calls a card in Done overdue, matching the completion rule', () => {
-    expect(isVisibleCard(board().cards.tax, criteria({ overdueOnly: true }), true, TODAY)).toBe(false);
+    expect(isVisibleCard(board().cards.tax, criteria({ overdueOnly: true }), { done: true, today: TODAY })).toBe(false);
   });
 
   it('admits only work due inside the chosen window', () => {
     const window = criteria({ dueWithinDays: 7 });
-    expect(isVisibleCard(board().cards.c, window, false, TODAY)).toBe(true);
-    expect(isVisibleCard(board().cards.d, window, false, TODAY)).toBe(false);
-    expect(isVisibleCard(board().cards.e, window, false, TODAY)).toBe(false);
+    expect(isVisibleCard(board().cards.c, window, { today: TODAY })).toBe(true);
+    expect(isVisibleCard(board().cards.d, window, { today: TODAY })).toBe(false);
+    expect(isVisibleCard(board().cards.e, window, { today: TODAY })).toBe(false);
+  });
+
+  it('admits only work filed inside the chosen window', () => {
+    // "Today" here is a fixed date, so the fixture dates are built relative to it
+    // rather than to the machine's clock, which the test does not control.
+    const sixHoursAgo = new Date(2026, 8, 25, 6).getTime();
+    const longAgo = new Date(2026, 7, 1).getTime();
+    const recent = criteria({ filedWithinDays: 7 });
+    expect(isVisibleCard(card({ id: 'fresh', createdAt: sixHoursAgo }), recent, { today: TODAY })).toBe(true);
+    expect(isVisibleCard(card({ id: 'stale', createdAt: longAgo }), recent, { today: TODAY })).toBe(false);
+    // A card filed in the future is not "filed recently"; it is a clock problem.
+    const future = new Date(2026, 8, 30).getTime();
+    expect(isVisibleCard(card({ id: 'future', createdAt: future }), recent, { today: TODAY })).toBe(false);
   });
 
   it('treats an unset dimension as no filter at all', () => {
@@ -141,5 +154,18 @@ describe('isViewActive', () => {
     expect(isViewActive(criteria({ overdueOnly: true }), 'manual')).toBe(true);
     expect(isViewActive(criteria({ dueWithinDays: 7 }), 'manual')).toBe(true);
     expect(isViewActive(criteria({ columnTitle: 'todo' }), 'manual')).toBe(true);
+    expect(isViewActive(criteria({ filedWithinDays: 7 }), 'manual')).toBe(true);
+  });
+
+  // A dimension registered in the criteria but not in the gate would leave
+  // positional reordering enabled over a view that does not match stored order, and
+  // nothing else would notice. So the gate is checked against the criteria's own keys.
+  it('knows about every dimension the criteria declares', () => {
+    const declared = Object.keys(NO_FILTERS).filter((key) => key !== 'sort') as Array<keyof FilterCriteria>;
+    for (const key of declared) {
+      // A value that is "set" for this dimension, so the gate has to notice it.
+      const set: FilterCriteria = { ...NO_FILTERS, [key]: key === 'priority' ? 'high' : key === 'overdueOnly' ? true : key === 'query' || key === 'columnTitle' ? 'x' : 7 } as FilterCriteria;
+      expect(isViewActive(set, 'manual'), `${key} is a dimension the gate ignores`).toBe(true);
+    }
   });
 });

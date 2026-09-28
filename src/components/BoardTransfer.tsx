@@ -9,7 +9,8 @@ export type TransferResult = 'replaced' | 'invalid' | 'unreadable';
 
 interface BoardTransferProps {
   board: BoardState;
-  onReplace: (next: BoardState) => void;
+  /** Writes the board wholesale. Recorded, so an import is undoable. */
+  onReplace: (updater: (current: BoardState) => BoardState) => void;
   /** Reports the outcome, including a refusal, so the board can say what happened. */
   onResult: (result: TransferResult) => void;
 }
@@ -39,7 +40,7 @@ export function BoardTransfer({ board, onReplace, onResult }: BoardTransferProps
 
   const confirmImport = () => {
     if (!pending) return;
-    onReplace(pending);
+    onReplace(() => pending);
     setPending(null);
     onResult('replaced');
   };
@@ -66,7 +67,7 @@ export function BoardTransfer({ board, onReplace, onResult }: BoardTransferProps
       {pending ? (
         <div role="status" className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wide text-muted">
           <span>Replace this board?</span>
-          <Button variant="default" size="sm" onClick={confirmImport}>Import</Button>
+          <Button variant="outline" size="sm" onClick={confirmImport}>Import</Button>
           <Button variant="ghost" size="sm" onClick={() => setPending(null)}>Cancel</Button>
         </div>
       ) : null}

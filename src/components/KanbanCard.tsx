@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { IconAlertTriangle, IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowUp, IconChevronDown, IconChevronUp, IconGripVertical, IconPencil, IconTrash } from '@tabler/icons-react';
+import { IconAlertTriangle, IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowUp, IconChevronDown, IconCheck, IconChevronUp, IconGripVertical, IconPencil, IconTrash } from '@tabler/icons-react';
 import type { DragEvent } from 'react';
 import { useMotionTransition } from '@/hooks/useMotionTransition';
 import { formatDueDate, formatFiledDate } from '@/lib/dates';
@@ -56,15 +56,26 @@ export function KanbanCard({ card, done, overdue, expanded, canMoveUp, canMoveDo
     {dropIndicator && <motion.div initial={{ opacity: 0, scaleY: 0.6 }} animate={{ opacity: 1, scaleY: 1 }} transition={transition} className={dropPlaceholderClass} aria-hidden="true" />}
     <motion.div layout transition={transition} draggable onDragStart={(event) => onDragStart(event as unknown as DragEvent<HTMLElement>, card.id)} onDragEnd={onDragEnd} onDragOver={(event) => { event.stopPropagation(); onDragOver(event, card.id); }} onDragEnter={(event) => { event.stopPropagation(); onDragEnter(event, card.id); }} onDragLeave={onDragLeave} onDrop={(event) => { event.stopPropagation(); onDrop(event, card.id); }} role="group" aria-label={card.title} className={cn('group relative flex flex-col gap-1.5 border-b border-line px-1 py-2.5 last:border-b-0', selected && 'bg-raised')}>
       <div className="flex items-stretch gap-2.5">
-        {/* A square checkbox, not a tinted row: selection is carried by the checked
-            state and the word Selected, never by colour alone. */}
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={() => onToggleSelected(card.id)}
+        {/* A 28px button wrapping a visually smaller box, so the hit area meets the
+            strip-control target floor rather than shipping a 14px target. It is not
+            hidden below lg: selection must work on touch, where there is no hover to
+            reveal it. The checked state and the word Selected carry the meaning, so
+            the accent fill is a convenience rather than the signal. */}
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={selected}
           aria-label={`Select ${card.title}`}
-          className="mt-0.5 hidden h-3.5 w-3.5 shrink-0 cursor-pointer accent-[var(--color-accent)] lg:block"
-        />
+          onClick={() => onToggleSelected(card.id)}
+          className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center"
+        >
+          <span
+            aria-hidden="true"
+            className={cn('flex h-3.5 w-3.5 items-center justify-center rounded-[2px] border', selected ? 'border-accent bg-accent' : 'border-line-strong')}
+          >
+            {selected && <IconCheck size={11} stroke={2} className="text-accent-fg" />}
+          </span>
+        </button>
         <span aria-hidden="true" className="mt-0.5 hidden w-3 shrink-0 cursor-grab text-faint transition-colors group-hover:text-muted lg:block"><IconGripVertical size={14} stroke={1.5} /></span>
         <span aria-hidden="true" className={cn('mt-0.5 w-1 shrink-0 rounded-full', rail)} />
         <div className="min-w-0 flex-1">
