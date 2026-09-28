@@ -6,21 +6,29 @@ import { Button } from '@/components/ui/button';
 import { AnalyticsBar } from './components/AnalyticsBar';
 import { AddColumn, BoardColumn } from './components/BoardColumn';
 import { BoardHeader } from './components/BoardHeader';
+import { BoardTransfer } from './components/BoardTransfer';
+import type { TransferResult } from './components/BoardTransfer';
 import type { MoveDirection } from './components/KanbanCard';
 import { StorageNotice } from './components/StorageNotice';
 import { useKanbanBoard } from './hooks/useKanbanBoard';
 import { useMotionTransition } from './hooks/useMotionTransition';
 import { computeAnalytics } from './lib/analytics';
-import { adjacentColumnOf, addCard as addCardToBoard, isColumnAtLimit, isFilterActive, moveCard, moveCardToAdjacentColumn, moveCardWithinColumn, moveColumnToAdjacent, pruneExpandedIds, removeCard, resolveInsertAfter, updateCard } from './lib/board';
-import { visibleByColumn as computeVisibleByColumn } from './lib/filter';
+import { adjacentColumnOf, addCard as addCardToBoard, isColumnAtLimit, moveCard, moveCardToAdjacentColumn, moveCardWithinColumn, moveColumnToAdjacent, pruneExpandedIds, removeCard, resolveInsertAfter, updateCard } from './lib/board';
+import { isViewActive, visibleByColumn as computeVisibleByColumn } from './lib/filter';
+import type { FilterCriteria } from './lib/filter';
+import { sortCardIds } from './lib/sort';
 import { makeId } from './lib/ids';
 import { normalizeCardDraft } from './lib/validation';
-import type { CardDraft, CardItem, ColumnItem, DropTarget, PriorityFilter } from './types/kanban';
+import type { CardDraft, CardItem, ColumnItem, DropTarget, PriorityFilter, SortMode } from './types/kanban';
 
 export default function KanbanBoard(): JSX.Element {
-  const { board, mutate: updateBoard, undo, redo, canUndo, canRedo, storageWarning, dismissStorageWarning } = useKanbanBoard();
+  const { board, mutate: updateBoard, undo, redo, canUndo, canRedo, replaceBoard, storageWarning, dismissStorageWarning } = useKanbanBoard();
   const [search, setSearch] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
+  const [sort, setSort] = useState<SortMode>('manual');
+  const [overdueOnly, setOverdueOnly] = useState(false);
+  const [dueWithinDays, setDueWithinDays] = useState<number | null>(null);
+  const [columnTitle, setColumnTitle] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [activeFormColumn, setActiveFormColumn] = useState<string | null>(null);
   const [addingColumn, setAddingColumn] = useState(false);
@@ -54,9 +62,18 @@ export default function KanbanBoard(): JSX.Element {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [undo, redo]);
 
-  const criteria = useMemo(() => ({ query: search, priority: priorityFilter }), [search, priorityFilter]);
-  const positionalEnabled = !isFilterActive(search, priorityFilter);
+  const criteria = useMemo<FilterCriteria>(
+    () => ({ query: search, priority: priorityFilter, overdueOnly, dueWithinDays, columnTitle }),
+    [search, priorityFilter, overdueOnly, dueWithinDays, columnTitle],
+  );
+  // One gate for the positional-reorder rule, and it counts a sort as well as a
+  // filter, because a sorted column has the same hazard a filtered one does.
+  const positionalEnabled = !isViewActive(criteria, sort);
   const visibleByColumn = useMemo(() => computeVisibleByColumn(board, criteria), [board, criteria]);
+  const renderedByColumn = useMemo(
+    () => Object.fromEntries(Object.entries(visibleByColumn).map(([id, ids]) => [id, sortCardIds(ids, board, sort)])),
+    [visibleByColumn, board, sort],
+  );
   const analytics = useMemo(() => computeAnalytics(board), [board]);
 
   const saveColumn = () => { const title = newColumnTitle.trim(); if (!title) return; updateBoard((current) => ({ ...current, columns: [...current.columns, { id: makeId('column'), title, cardIds: [] }] })); setNewColumnTitle(''); setAddingColumn(false); };
@@ -85,6 +102,14 @@ export default function KanbanBoard(): JSX.Element {
     updateBoard((current) => ({ ...current, columns: current.columns.map((column) => (column.id === limitingColumn ? (limit === undefined ? { id: column.id, title: column.title, cardIds: column.cardIds } : { ...column, limit }) : column)) }));
     setLimitingColumn(null);
   };
+  // Routed through the board's one existing notice channel rather than a second
+  // live region, so an import outcome is announced the same way a limit refusal
+  // is and the board never has two competing status regions.
+  const reportTransfer = (result: TransferResult) => {
+    if (result === 'replaced') setColumnNotice('Board imported.');
+    else if (result === 'invalid') setColumnNotice('That file is not a board, so nothing was changed.');
+    else setColumnNotice('That file could not be read as JSON, so nothing was changed.');
+  };
   const refuseIfAtLimit = (cardId: string, target: ColumnItem | undefined): boolean => {
     if (!target || !isColumnAtLimit(target)) return false;
     if (board.columns.some((column) => column.id === target.id && column.cardIds.includes(cardId))) return false;
@@ -100,5 +125,5 @@ export default function KanbanBoard(): JSX.Element {
   const handleColumnDragOver = (event: DragEvent<HTMLElement>, columnId: string) => handleDragOver(event, columnId);
   const beginRename = (column: ColumnItem) => { setRenamingColumn(column.id); setRenameValue(column.title); setActiveFormColumn(null); };
 
-  return <div className="min-h-screen min-w-0 overflow-x-hidden bg-base pb-16 text-ink"><BoardHeader search={search} priorityFilter={priorityFilter} onSearchChange={setSearch} onPriorityChange={setPriorityFilter} canUndo={canUndo} canRedo={canRedo} onUndo={undo} onRedo={redo} /><main className="mx-auto min-w-0 max-w-[1600px] px-4 py-5 sm:px-6 lg:px-10"><StorageNotice warning={storageWarning} onDismiss={dismissStorageWarning} />{columnNotice && <div role="status" aria-live="polite" className="mb-4 flex items-center justify-between gap-3 rounded-strip border border-line-strong bg-raised px-3 py-2 text-xs text-muted"><span className="min-w-0 flex-1 leading-5">{columnNotice}</span><Button variant="ghost" size="icon" onClick={() => setColumnNotice(null)} aria-label="Dismiss column notice" className="h-6 w-6"><IconX size={12} stroke={1.5} /></Button></div>}<motion.div layout transition={transition} className="min-w-0 overflow-x-auto" onDragLeave={handleDragLeave}><div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:gap-4"><AnimatePresence initial={false}>{board.columns.map((column, index) => <BoardColumn key={column.id} column={column} cards={visibleByColumn[column.id].map((id) => board.cards[id]).filter((card): card is NonNullable<typeof card> => Boolean(card))} activeForm={activeFormColumn === column.id} renaming={renamingColumn === column.id} renameValue={renameValue} draggedCardId={draggedCardId} dropTarget={dropTarget} positionalEnabled={positionalEnabled} canMoveLeft={index > 0} canMoveRight={index < board.columns.length - 1} onStartCardForm={() => { setActiveFormColumn(column.id); setAddingColumn(false); }} onSaveCard={(draft) => addCard(column.id, draft)} onCancelCardForm={() => setActiveFormColumn(null)} onBeginRename={() => beginRename(column)} onRenameChange={setRenameValue} onSaveRename={saveRename} onCancelRename={() => setRenamingColumn(null)} onDeleteColumn={() => requestDeleteColumn(column)} onDeleteCard={deleteCard} onEditCard={beginEditCard} editingCardId={editingCardId} onSaveCardDraft={saveEditedCard} onCancelEditCard={() => setEditingCardId(null)} onMoveColumn={(direction) => moveColumnTo(column.id, direction)} settingLimit={limitingColumn === column.id} limitValue={limitValue} onStartLimit={() => beginLimit(column)} onLimitChange={setLimitValue} onSaveLimit={saveLimit} onCancelLimit={() => setLimitingColumn(null)} onMove={moveCardTo} expandedIds={expandedIds} onToggleExpanded={(id) => setExpandedIds((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })} onDragStart={handleDragStart} onDragEnd={clearDrag} onDragOver={(event, id) => id ? handleDragOver(event, column.id, id) : handleColumnDragOver(event, column.id)} onDragEnter={(event, id) => id ? handleDragOver(event, column.id, id) : handleColumnDragOver(event, column.id)} onDragLeave={handleDragLeave} onDrop={(event, id) => handleDrop(event, column.id, id)} />)}{addingColumn ? <AddColumn value={newColumnTitle} inputRef={newColumnRef} onChange={setNewColumnTitle} onSave={saveColumn} onCancel={() => { setAddingColumn(false); setNewColumnTitle(''); }} /> : <Button variant="ghost" onClick={() => { setAddingColumn(true); setActiveFormColumn(null); }} className="w-full shrink-0 justify-start rounded-none px-4 py-4 font-mono text-[11px] uppercase tracking-wide text-muted lg:w-44 lg:px-5 lg:py-3"><IconCirclePlus size={14} stroke={1.5} /> Add bay</Button>}</AnimatePresence></div></motion.div></main><AnalyticsBar {...analytics} /></div>;
+  return <div className="min-h-screen min-w-0 overflow-x-hidden bg-base pb-16 text-ink"><BoardHeader search={search} priorityFilter={priorityFilter} onSearchChange={setSearch} onPriorityChange={setPriorityFilter} overdueOnly={overdueOnly} onOverdueOnlyChange={setOverdueOnly} dueWithinDays={dueWithinDays} onDueWithinChange={setDueWithinDays} columnTitle={columnTitle} onColumnTitleChange={setColumnTitle} sort={sort} onSortChange={setSort} canUndo={canUndo} canRedo={canRedo} onUndo={undo} onRedo={redo} transfer={<BoardTransfer board={board} onReplace={replaceBoard} onResult={reportTransfer} />} /><main className="mx-auto min-w-0 max-w-[1600px] px-4 py-5 sm:px-6 lg:px-10"><StorageNotice warning={storageWarning} onDismiss={dismissStorageWarning} />{columnNotice && <div role="status" aria-live="polite" className="mb-4 flex items-center justify-between gap-3 rounded-strip border border-line-strong bg-raised px-3 py-2 text-xs text-muted"><span className="min-w-0 flex-1 leading-5">{columnNotice}</span><Button variant="ghost" size="icon" onClick={() => setColumnNotice(null)} aria-label="Dismiss column notice" className="h-6 w-6"><IconX size={12} stroke={1.5} /></Button></div>}<motion.div layout transition={transition} className="min-w-0 overflow-x-auto" onDragLeave={handleDragLeave}><div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:gap-4"><AnimatePresence initial={false}>{board.columns.map((column, index) => <BoardColumn key={column.id} column={column} cards={renderedByColumn[column.id].map((id) => board.cards[id]).filter((card): card is NonNullable<typeof card> => Boolean(card))} activeForm={activeFormColumn === column.id} renaming={renamingColumn === column.id} renameValue={renameValue} draggedCardId={draggedCardId} dropTarget={dropTarget} positionalEnabled={positionalEnabled} canMoveLeft={index > 0} canMoveRight={index < board.columns.length - 1} onStartCardForm={() => { setActiveFormColumn(column.id); setAddingColumn(false); }} onSaveCard={(draft) => addCard(column.id, draft)} onCancelCardForm={() => setActiveFormColumn(null)} onBeginRename={() => beginRename(column)} onRenameChange={setRenameValue} onSaveRename={saveRename} onCancelRename={() => setRenamingColumn(null)} onDeleteColumn={() => requestDeleteColumn(column)} onDeleteCard={deleteCard} onEditCard={beginEditCard} editingCardId={editingCardId} onSaveCardDraft={saveEditedCard} onCancelEditCard={() => setEditingCardId(null)} onMoveColumn={(direction) => moveColumnTo(column.id, direction)} settingLimit={limitingColumn === column.id} limitValue={limitValue} onStartLimit={() => beginLimit(column)} onLimitChange={setLimitValue} onSaveLimit={saveLimit} onCancelLimit={() => setLimitingColumn(null)} onMove={moveCardTo} expandedIds={expandedIds} onToggleExpanded={(id) => setExpandedIds((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })} onDragStart={handleDragStart} onDragEnd={clearDrag} onDragOver={(event, id) => id ? handleDragOver(event, column.id, id) : handleColumnDragOver(event, column.id)} onDragEnter={(event, id) => id ? handleDragOver(event, column.id, id) : handleColumnDragOver(event, column.id)} onDragLeave={handleDragLeave} onDrop={(event, id) => handleDrop(event, column.id, id)} />)}{addingColumn ? <AddColumn value={newColumnTitle} inputRef={newColumnRef} onChange={setNewColumnTitle} onSave={saveColumn} onCancel={() => { setAddingColumn(false); setNewColumnTitle(''); }} /> : <Button variant="ghost" onClick={() => { setAddingColumn(true); setActiveFormColumn(null); }} className="w-full shrink-0 justify-start rounded-none px-4 py-4 font-mono text-[11px] uppercase tracking-wide text-muted lg:w-44 lg:px-5 lg:py-3"><IconCirclePlus size={14} stroke={1.5} /> Add bay</Button>}</AnimatePresence></div></motion.div></main><AnalyticsBar {...analytics} /></div>;
 }

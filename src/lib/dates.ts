@@ -22,9 +22,14 @@ export function addDays(date: Date, days: number): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 }
 
-function dayNumber(value: string): number {
+export function dayNumber(value: string): number {
   const [year, month, day] = value.split('-').map(Number);
   return Date.UTC(year, month - 1, day) / 86_400_000;
+}
+
+/** Days since the epoch, for a validated YYYY-MM-DD. Named for callers outside this module. */
+export function dayNumberFromString(value: string): number {
+  return dayNumber(value);
 }
 
 export function formatDueDate(value: string, today = localDateString()): string {

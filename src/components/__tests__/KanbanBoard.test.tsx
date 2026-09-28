@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import KanbanBoard from '../../KanbanBoard';
 import { STORAGE_KEY } from '../../lib/constants';
 import { createSeedState } from '../../lib/persistence';
+import { addDays, localDateString } from '../../lib/dates';
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -62,6 +63,67 @@ describe('KanbanBoard filtered move safety', () => {
     expect(within(card).getByRole('button', { name: 'Move Plan weekly groceries up' })).toBeDisabled();
     expect(within(card).getByRole('button', { name: 'Move Plan weekly groceries down' })).toBeDisabled();
     expect(within(card).getByRole('button', { name: 'Move Plan weekly groceries to the next column' })).toBeEnabled();
+  });
+
+  // The gate below used to know only the text query and the priority. A dimension
+  // it did not know about left positional moves enabled over a view that no longer
+  // matched stored order, which is the exact scramble ADR-0002 prevents. So each
+  // dimension is asserted separately rather than trusting the query case.
+  //
+  // A board is seeded that satisfies every dimension at once: an overdue card, a
+  // card due inside the week, a card matching a bay name, and cards with distinct
+  // due dates. Otherwise a dimension could empty the board and the assertion would
+  // pass vacuously.
+  function boardForEveryDimension(): void {
+    const board = createSeedState(new Date(2026, 8, 25));
+    board.cards['card-tax'] = { ...board.cards['card-tax'], dueDate: '2000-01-01' };
+    board.cards['card-research'] = { ...board.cards['card-research'], dueDate: '2000-01-01' };
+    board.cards['card-books'] = { ...board.cards['card-books'], dueDate: '2026-09-27' };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
+  }
+
+  it.each([
+    ['the overdue dimension', async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole('button', { name: 'Overdue only' }))],
+    ['a due window', async (user: ReturnType<typeof userEvent.setup>) => user.selectOptions(screen.getByLabelText('Filter by due window'), '7')],
+    ['a column title', async (user: ReturnType<typeof userEvent.setup>) => user.type(screen.getByLabelText('Filter by column title'), 'To Do')],
+    ['a sort', async (user: ReturnType<typeof userEvent.setup>) => user.selectOptions(screen.getByLabelText('Sort cards'), 'dueDate')],
+  ])('disables positional moves under %s, not just a text query', async (_label, apply) => {
+    const user = userEvent.setup();
+    boardForEveryDimension();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+    await apply(user);
+
+    // A sort filters nothing, so unlike the other dimensions it leaves every strip
+    // on the board. It is the case that proves the gate is not merely responding to
+    // cards disappearing from the view.
+    const strips = screen.getAllByRole('group');
+    expect(strips.length, 'the view must still render strips, or the check below is vacuous').toBeGreaterThan(0);
+
+    const bays = screen.getAllByRole('region');
+    expect(bays.length, 'the board must still render its bays').toBeGreaterThan(1);
+
+    for (const bay of bays) {
+      for (const strip of within(bay).queryAllByRole('group')) {
+        const name = strip.getAttribute('aria-label') ?? '';
+        expect(within(strip).getByRole('button', { name: `Move ${name} up` }), `${name} up`).toBeDisabled();
+        expect(within(strip).getByRole('button', { name: `Move ${name} down` }), `${name} down`).toBeDisabled();
+      }
+    }
+
+    // Cross-column moves still append, exactly as they do under a filter. Read off
+    // whichever non-final bay still holds a strip, since a dimension is free to
+    // empty any particular bay.
+    const withStrips = bays
+      .slice(0, -1)
+      .filter((bay) => within(bay).queryAllByRole('group').length > 0);
+    expect(withStrips.length, 'a non-final bay must still hold a strip').toBeGreaterThan(0);
+    for (const bay of withStrips) {
+      for (const strip of within(bay).queryAllByRole('group')) {
+        const name = strip.getAttribute('aria-label') ?? '';
+        expect(within(strip).getByRole('button', { name: `Move ${name} to the next column` }), `${name} across`).toBeEnabled();
+      }
+    }
   });
 });
 
@@ -294,6 +356,251 @@ describe('KanbanBoard undo and redo', () => {
     // The card is still deleted: Ctrl+Z inside the search field meant "undo my typing".
     expect(screen.queryByRole('group', { name: 'Research personal finance apps' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
+  });
+});
+
+describe('KanbanBoard filtering and sorting', () => {
+  const seed = (patch: (board: ReturnType<typeof createSeedState>) => void = () => {}) => {
+    const board = createSeedState(new Date(2026, 8, 25));
+    patch(board);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
+  };
+
+  const stripNamesIn = (bay: string): string[] =>
+    within(screen.getByLabelText(bay))
+      .queryAllByRole('group')
+      .map((strip) => strip.getAttribute('aria-label') ?? '');
+
+  it('filters to overdue cards, and never treats Done as overdue', async () => {
+    const user = userEvent.setup();
+    seed((board) => {
+      board.cards['card-tax'] = { ...board.cards['card-tax'], dueDate: '2000-01-01' };
+      board.cards['card-research'] = { ...board.cards['card-research'], dueDate: '2000-01-01' };
+    });
+    render(<KanbanBoard />);
+    await screen.findByLabelText('Backlog column');
+
+    await user.click(screen.getByRole('button', { name: 'Overdue only' }));
+
+    expect(stripNamesIn('Backlog column')).toEqual(['Research personal finance apps']);
+    expect(stripNamesIn('To Do column')).toEqual([]);
+    expect(stripNamesIn('Done column')).toEqual([]);
+  });
+
+  it('filters to cards due inside the chosen window', async () => {
+    const user = userEvent.setup();
+    // Dates are relative to the real today, because the window is measured from it.
+    const soon = localDateString(addDays(new Date(), 2));
+    const later = localDateString(addDays(new Date(), 40));
+    seed((board) => {
+      board.cards['card-books'] = { ...board.cards['card-books'], dueDate: soon };
+      // Every other card in the bay is pushed outside the window, so the assertion
+      // is about the window rather than about whatever the seed happened to contain.
+      board.cards['card-groceries'] = { ...board.cards['card-groceries'], dueDate: later };
+      board.cards['card-dentist'] = { ...board.cards['card-dentist'], dueDate: later };
+    });
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await user.selectOptions(screen.getByLabelText('Filter by due window'), '7');
+
+    expect(stripNamesIn('To Do column')).toEqual(['Organize reading list']);
+  });
+
+  it('finds cards by their column title', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await user.type(screen.getByLabelText('Filter by column title'), 'progress');
+
+    expect(stripNamesIn('To Do column')).toEqual([]);
+    expect(stripNamesIn('In Progress column')).toEqual(['Refresh portfolio case study', 'Prepare laundry schedule']);
+  });
+
+  it('keeps the existing text search working unchanged', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await user.type(screen.getByLabelText('Search cards by title or description'), 'groceries');
+
+    expect(stripNamesIn('To Do column')).toEqual(['Plan weekly groceries']);
+    expect(stripNamesIn('Backlog column')).toEqual([]);
+  });
+
+  it('sorts by due date without changing what is stored', async () => {
+    const user = userEvent.setup();
+    // Due dates deliberately disagree with stored order, so the sorted view is
+    // visibly different from the stored one.
+    seed((board) => {
+      board.cards['card-groceries'] = { ...board.cards['card-groceries'], dueDate: localDateString(addDays(new Date(), 30)) };
+      board.cards['card-dentist'] = { ...board.cards['card-dentist'], dueDate: localDateString(addDays(new Date(), 1)) };
+    });
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+    const before = stripNamesIn('To Do column');
+
+    await user.selectOptions(screen.getByLabelText('Sort cards'), 'dueDate');
+
+    // Sorted view differs from stored order, putting the sooner card first.
+    expect(before[0]).toBe('Plan weekly groceries');
+    expect(stripNamesIn('To Do column')[0]).toBe('Book dentist appointment');
+    // ...but nothing was written: the same cards are still there, in the old order.
+    const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}');
+    const stored = saved.columns?.find((column: { id: string }) => column.id === 'column-todo')?.cardIds;
+    expect(stored?.map((id: string) => saved.cards[id].title)).toEqual(before);
+  });
+
+  it('returns to manual order', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+    const before = stripNamesIn('To Do column');
+
+    await user.selectOptions(screen.getByLabelText('Sort cards'), 'dueDate');
+    await user.selectOptions(screen.getByLabelText('Sort cards'), 'manual');
+
+    expect(stripNamesIn('To Do column')).toEqual(before);
+  });
+
+  it('composes a sort with a filter, sorting only what is visible', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('In Progress column');
+    await user.selectOptions(screen.getByLabelText('Sort cards'), 'dueDate');
+    const sortedAll = stripNamesIn('In Progress column');
+
+    await user.type(screen.getByLabelText('Search cards by title or description'), 'portfolio');
+
+    expect(stripNamesIn('In Progress column')).toEqual(['Refresh portfolio case study']);
+    expect(stripNamesIn('In Progress column')).toEqual(stripNamesIn('In Progress column').filter((name) => sortedAll.includes(name)));
+  });
+});
+
+describe('KanbanBoard export and import', () => {
+  /**
+   * Exports the board and captures what would have been downloaded. The blob body
+   * is read asynchronously, so it is awaited rather than assumed.
+   */
+  const exportFile = async (): Promise<{ name: string; content: string }> => {
+    let captured: { name: string; content: string } | null = null;
+    const createObjectURL = vi.fn((blob: Blob) => {
+      const record = { name: '', content: '' };
+      captured = record;
+      void blob.text().then((text) => {
+        record.content = text;
+      });
+      return 'blob:board';
+    });
+    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL: vi.fn() });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      if (captured) (captured as { name: string }).name = this.download;
+    });
+    try {
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Export board' }));
+      await waitFor(() => expect(captured).not.toBeNull());
+      await waitFor(() => expect((captured as unknown as { content: string }).content).not.toBe(''));
+      return captured as unknown as { name: string; content: string };
+    } finally {
+      click.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  };
+
+  /** Exports from a board already on screen, so the caller can then import into a fresh one. */
+  const exportFrom = async (): Promise<{ name: string; content: string }> => {
+    render(<KanbanBoard />);
+    await screen.findByLabelText('Backlog column');
+    return exportFile();
+  };
+
+  const importFile = async (user: ReturnType<typeof userEvent.setup>, content: string, name = 'board.json') => {
+    const file = new File([content], name, { type: 'application/json' });
+    await user.upload(screen.getByLabelText('Board file'), file);
+  };
+
+  it('exports the whole board as readable JSON', async () => {
+    const exported = await exportFrom();
+    expect(exported.name).toBe('noir-board.json');
+    const parsed = JSON.parse(exported.content);
+    expect(Object.keys(parsed.cards).length).toBeGreaterThan(0);
+    expect(parsed.columns.length).toBe(4);
+    // Readable, not minified: a person can open the export and hand-edit it.
+    expect(exported.content).toContain('\n  "cards"');
+  });
+
+  it('round-trips a board back in, after asking first', async () => {
+    const exported = await exportFrom();
+    cleanup();
+
+    const user = userEvent.setup();
+    window.localStorage.clear();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('Backlog column');
+
+    await importFile(user, exported.content);
+    // Nothing has been replaced yet: importing cannot quietly destroy work.
+    expect(await screen.findByRole('status')).toHaveTextContent(/replace this board/i);
+    expect(screen.getByRole('group', { name: 'Research personal finance apps' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Import' }));
+    expect(await screen.findByRole('status')).toHaveTextContent(/board imported/i);
+  });
+
+  it('lets a confirmation be cancelled, leaving the board alone', async () => {
+    const user = userEvent.setup();
+    const board = createSeedState(new Date(2026, 8, 25));
+    const other = { ...board, cards: { ...board.cards, 'card-tax': { ...board.cards['card-tax'], title: 'Something else entirely' } } };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
+    render(<KanbanBoard />);
+    await screen.findByLabelText('Backlog column');
+
+    await importFile(user, JSON.stringify(other));
+    await screen.findByRole('status');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.getByRole('group', { name: 'Archive tax documents' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Something else entirely' })).not.toBeInTheDocument();
+  });
+
+  it('rejects a file that is not a board, and changes nothing', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('Backlog column');
+
+    await importFile(user, JSON.stringify({ foo: 1 }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/not a board, so nothing was changed/i);
+    expect(screen.getByRole('group', { name: 'Research personal finance apps' })).toBeInTheDocument();
+  });
+
+  it('rejects a file that is not JSON at all, and changes nothing', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('Backlog column');
+
+    await importFile(user, 'this is not json', 'notes.txt');
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/could not be read as JSON/i);
+    expect(screen.getByRole('group', { name: 'Research personal finance apps' })).toBeInTheDocument();
+  });
+
+  it('makes an import undoable, since it is a mutation like any other', async () => {
+    const exported = await exportFrom();
+    cleanup();
+
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('Backlog column');
+
+    await importFile(user, exported.content);
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    expect(await screen.findByRole('group', { name: 'Archive tax documents' })).toBeInTheDocument();
+
+    // The import is a recorded mutation, so one undo puts the board back.
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(await screen.findByRole('group', { name: 'Archive tax documents' })).toBeInTheDocument();
   });
 });
 
