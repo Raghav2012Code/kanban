@@ -31,6 +31,8 @@ interface BoardHeaderProps {
   onUndo: () => void;
   onRedo: () => void;
   transfer: ReactNode;
+  /** Rendered only while cards are selected, so it never becomes a second toolbar. */
+  selectionBar?: ReactNode;
 }
 
 export function BoardHeader({
@@ -51,6 +53,7 @@ export function BoardHeader({
   onUndo,
   onRedo,
   transfer,
+  selectionBar,
 }: BoardHeaderProps): JSX.Element {
   return (
     <header className="border-b border-line px-4 py-5 sm:px-6 lg:px-10">
@@ -64,7 +67,7 @@ export function BoardHeader({
           <p className="mt-1 max-w-md text-sm text-muted">A quiet system for moving important work forward.</p>
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="flex items-center gap-1">
             <Button variant="outline" size="icon" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo (Ctrl+Z)" className="h-9 w-9">
               <IconArrowBackUp size={14} stroke={1.5} />
@@ -74,6 +77,8 @@ export function BoardHeader({
             </Button>
             {transfer}
           </div>
+
+          {selectionBar}
 
           <label className="relative">
             <IconSearch size={16} stroke={1.5} aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />

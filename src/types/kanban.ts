@@ -6,6 +6,7 @@ export interface CardItem {
   description?: string;
   priority: Priority;
   dueDate?: string;
+  /** When the card was filed. Written on every card and, before this work, never read. */
   createdAt: number;
 }
 

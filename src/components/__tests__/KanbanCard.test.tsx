@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { KanbanCard } from '../KanbanCard';
@@ -19,6 +19,8 @@ function renderCard(overrides: Partial<ComponentProps<typeof KanbanCard>> = {}) 
     canMoveRight: true,
     onDelete: vi.fn(),
     onEdit: vi.fn(),
+    selected: false,
+    onToggleSelected: vi.fn(),
     onToggleExpanded: vi.fn(),
     onMove: vi.fn(),
     onDragStart: vi.fn(),
@@ -44,14 +46,18 @@ describe('KanbanCard overdue state', () => {
     renderCard({ overdue: false });
     expect(screen.queryByRole('img', { name: 'Overdue' })).not.toBeInTheDocument();
   });
+
 });
+
 
 describe('KanbanCard priority', () => {
   it('exposes priority as a labelled meter', () => {
     renderCard();
     expect(screen.getByRole('img', { name: 'Priority: high' })).toBeInTheDocument();
   });
+
 });
+
 
 describe('KanbanCard controls', () => {
   it('keeps delete reachable without hover', async () => {
@@ -84,5 +90,22 @@ describe('KanbanCard controls', () => {
     expect(screen.getByRole('button', { name: 'Move Write spec to the previous column' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Move Write spec down' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Move Write spec to the next column' })).toBeEnabled();
+  });
+
+  it('reports the selection state in words, not only in a tint', () => {
+    renderCard();
+    expect(screen.queryByText('Selected')).not.toBeInTheDocument();
+    cleanup();
+    renderCard({ selected: true });
+    // The tint alone would vanish in greyscale; the word is what carries the state.
+    expect(screen.getByText('Selected')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Select Write spec' })).toBeChecked();
+  });
+
+  it('toggles selection through its own control', async () => {
+    const user = userEvent.setup();
+    const props = renderCard();
+    await user.click(screen.getByRole('checkbox', { name: 'Select Write spec' }));
+    expect(props.onToggleSelected).toHaveBeenCalledWith('card-1');
   });
 });

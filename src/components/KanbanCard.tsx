@@ -2,7 +2,7 @@ import { motion } from 'motion/react';
 import { IconAlertTriangle, IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowUp, IconChevronDown, IconChevronUp, IconGripVertical, IconPencil, IconTrash } from '@tabler/icons-react';
 import type { DragEvent } from 'react';
 import { useMotionTransition } from '@/hooks/useMotionTransition';
-import { formatDueDate } from '@/lib/dates';
+import { formatDueDate, formatFiledDate } from '@/lib/dates';
 import { tailNumber } from '@/lib/ids';
 import { cn } from '@/lib/utils';
 import type { CardItem } from '@/types/kanban';
@@ -22,6 +22,9 @@ interface KanbanCardProps {
   canMoveRight: boolean;
   onDelete: (id: string) => void;
   onEdit: (id: string) => void;
+  /** Selection is view state, never board state. */
+  selected: boolean;
+  onToggleSelected: (id: string) => void;
   onToggleExpanded: (id: string) => void;
   onMove: (id: string, direction: MoveDirection) => void;
   onDragStart: (event: DragEvent<HTMLElement>, id: string) => void;
@@ -45,14 +48,23 @@ const moveControls: { direction: MoveDirection; label: string; Icon: typeof Icon
   { direction: 'right', label: 'to the next column', Icon: IconArrowRight, can: 'canMoveRight' },
 ];
 
-export function KanbanCard({ card, done, overdue, expanded, canMoveUp, canMoveDown, canMoveLeft, canMoveRight, onDelete, onEdit, onToggleExpanded, onMove, onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop, dropIndicator }: KanbanCardProps): JSX.Element {
+export function KanbanCard({ card, done, overdue, expanded, canMoveUp, canMoveDown, canMoveLeft, canMoveRight, onDelete, onEdit, selected, onToggleSelected, onToggleExpanded, onMove, onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop, dropIndicator }: KanbanCardProps): JSX.Element {
   const transition = useMotionTransition();
   const canMove = { canMoveUp, canMoveDown, canMoveLeft, canMoveRight };
   const rail = done ? 'bg-cleared' : overdue ? 'bg-hold' : 'bg-line-strong';
   return <>
     {dropIndicator && <motion.div initial={{ opacity: 0, scaleY: 0.6 }} animate={{ opacity: 1, scaleY: 1 }} transition={transition} className={dropPlaceholderClass} aria-hidden="true" />}
-    <motion.div layout transition={transition} draggable onDragStart={(event) => onDragStart(event as unknown as DragEvent<HTMLElement>, card.id)} onDragEnd={onDragEnd} onDragOver={(event) => { event.stopPropagation(); onDragOver(event, card.id); }} onDragEnter={(event) => { event.stopPropagation(); onDragEnter(event, card.id); }} onDragLeave={onDragLeave} onDrop={(event) => { event.stopPropagation(); onDrop(event, card.id); }} role="group" aria-label={card.title} className="group relative flex flex-col gap-1.5 border-b border-line px-1 py-2.5 last:border-b-0">
+    <motion.div layout transition={transition} draggable onDragStart={(event) => onDragStart(event as unknown as DragEvent<HTMLElement>, card.id)} onDragEnd={onDragEnd} onDragOver={(event) => { event.stopPropagation(); onDragOver(event, card.id); }} onDragEnter={(event) => { event.stopPropagation(); onDragEnter(event, card.id); }} onDragLeave={onDragLeave} onDrop={(event) => { event.stopPropagation(); onDrop(event, card.id); }} role="group" aria-label={card.title} className={cn('group relative flex flex-col gap-1.5 border-b border-line px-1 py-2.5 last:border-b-0', selected && 'bg-raised')}>
       <div className="flex items-stretch gap-2.5">
+        {/* A square checkbox, not a tinted row: selection is carried by the checked
+            state and the word Selected, never by colour alone. */}
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleSelected(card.id)}
+          aria-label={`Select ${card.title}`}
+          className="mt-0.5 hidden h-3.5 w-3.5 shrink-0 cursor-pointer accent-[var(--color-accent)] lg:block"
+        />
         <span aria-hidden="true" className="mt-0.5 hidden w-3 shrink-0 cursor-grab text-faint transition-colors group-hover:text-muted lg:block"><IconGripVertical size={14} stroke={1.5} /></span>
         <span aria-hidden="true" className={cn('mt-0.5 w-1 shrink-0 rounded-full', rail)} />
         <div className="min-w-0 flex-1">
@@ -62,6 +74,14 @@ export function KanbanCard({ card, done, overdue, expanded, canMoveUp, canMoveDo
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
             <PriorityMeter priority={card.priority} />
+            {selected && <span className="font-mono text-[11px] uppercase tracking-wide text-muted">Selected</span>}
+            {/* The filed date uses the same monospace treatment as the due date, so a
+                card's age reads as part of the system rather than as an addition. It is
+                rendered absolutely, because a relative offset is meaningless as a filing
+                time — the board's relative treatment is for deadlines, not history. */}
+            <span className="font-mono text-[11px] tabular-nums text-faint" title={`Filed ${formatFiledDate(card.createdAt)}`}>
+              {formatFiledDate(card.createdAt)}
+            </span>
             {done && <span role="img" aria-label="Done" className="sr-only">Done</span>}
             {card.dueDate && (overdue
               ? <span role="img" aria-label="Overdue" title={card.dueDate} className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-wide text-hold"><IconAlertTriangle size={12} stroke={1.5} aria-hidden="true" />{formatDueDate(card.dueDate)}</span>

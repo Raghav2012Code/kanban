@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import KanbanBoard from '../../KanbanBoard';
-import { STORAGE_KEY } from '../../lib/constants';
+import { COLLAPSED_COLUMNS_KEY, STORAGE_KEY } from '../../lib/constants';
 import { createSeedState } from '../../lib/persistence';
-import { addDays, localDateString } from '../../lib/dates';
+import { addDays, formatFiledDate, localDateString } from '../../lib/dates';
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -601,6 +601,346 @@ describe('KanbanBoard export and import', () => {
     // The import is a recorded mutation, so one undo puts the board back.
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(await screen.findByRole('group', { name: 'Archive tax documents' })).toBeInTheDocument();
+  });
+});
+
+describe('KanbanBoard filed date', () => {
+  it('shows when a card was filed, as an absolute date', async () => {
+    const board = createSeedState(new Date(2026, 8, 25));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
+    render(<KanbanBoard />);
+
+    const strip = await screen.findByRole('group', { name: 'Plan weekly groceries' });
+    // Read the expected value from the card itself, so the assertion is about the
+    // date being surfaced rather than about one hand-computed seed constant.
+    const filed = board.cards['card-groceries'];
+    if (!filed) throw new Error('seed is missing the card');
+    expect(within(strip).getByTitle(`Filed ${formatFiledDate(filed.createdAt)}`)).toBeInTheDocument();
+  });
+
+  it('does not reuse the relative due-date treatment for a filing time', async () => {
+    render(<KanbanBoard />);
+    const strip = await screen.findByRole('group', { name: 'Plan weekly groceries' });
+
+    const filed = within(strip).getByTitle(/^Filed \d{4}-\d{2}-\d{2}$/);
+    // A relative offset would read as "8D" and mean nothing as a filing time.
+    expect(filed).toHaveTextContent(/^\d{4}-\d{2}-\d{2}$/);
+    expect(filed.textContent).not.toMatch(/LATE|TMRW|TODAY|\+\d+D/);
+  });
+
+  it('adds no field to the card, and the date is a sort dimension', async () => {
+    const user = userEvent.setup();
+    const before = createSeedState(new Date(2026, 8, 25));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(before));
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    // The card shape is untouched: the filed value already existed and was merely
+    // surfaced. No new field, no schema change.
+    const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}');
+    expect(Object.keys(saved.cards['card-groceries']).sort()).toEqual(
+      Object.keys(before.cards['card-groceries']).sort(),
+    );
+
+    // The existing filed value is now usable as a sort, which it could not be before.
+    await user.selectOptions(screen.getByLabelText('Sort cards'), 'filedDate');
+    expect(screen.getAllByRole('group').length).toBeGreaterThan(0);
+  });
+});
+
+describe('KanbanBoard announcements', () => {
+  const notice = async () => (await screen.findByRole('status')).textContent ?? '';
+
+  it('announces a completed move, naming the card and where it went', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    const todo = await screen.findByLabelText('To Do column');
+
+    await user.click(within(todo).getByRole('button', { name: 'Move Plan weekly groceries to the next column' }));
+
+    // Informative rather than a bare "done": a person needs to know what moved where.
+    expect(await notice()).toMatch(/moved plan weekly groceries to in progress/i);
+    expect(await notice()).toMatch(/position \d+ of \d+/i);
+  });
+
+  it('announces an in-column move as a direction and a position', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    const todo = await screen.findByLabelText('To Do column');
+
+    await user.click(within(todo).getByRole('button', { name: 'Move Plan weekly groceries down' }));
+
+    expect(await notice()).toMatch(/moved plan weekly groceries down/i);
+    expect(await notice()).toMatch(/position 2 of 3/i);
+  });
+
+  it('announces a refused move with the reason, so silence is never ambiguous', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await user.click(screen.getByRole('button', { name: 'Set Work In Progress limit for To Do' }));
+    await user.type(screen.getByLabelText('Work In Progress limit for To Do'), '3');
+    await user.keyboard('{Enter}');
+    await user.click(screen.getByRole('button', { name: 'Move Research personal finance apps to the next column' }));
+
+    expect(await notice()).toMatch(/at its work in progress limit of 3/i);
+  });
+
+  it('announces a bulk move by naming the cards it moved', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await user.click(screen.getByRole('checkbox', { name: 'Select Organize reading list' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Plan weekly groceries' }));
+    await user.click(screen.getByRole('button', { name: 'Move 2 selected cards to In Progress' }));
+
+    expect(await notice()).toMatch(/moved 2 cards to in progress/i);
+    expect(await notice()).toMatch(/reading list/i);
+    expect(await notice()).toMatch(/weekly groceries/i);
+  });
+
+  it('uses one live region for the board, so a move is announced once', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    const todo = await screen.findByLabelText('To Do column');
+
+    // Nothing has happened, so the board-level channel is not in the document at all
+    // rather than sitting there empty and re-announcing on every change.
+    expect(screen.queryAllByRole('status', { hidden: true })).toHaveLength(0);
+
+    await user.click(within(todo).getByRole('button', { name: 'Move Plan weekly groceries to the next column' }));
+    await screen.findByRole('status');
+
+    // Exactly one appears. A second would announce the same event twice.
+    expect(screen.getAllByRole('status', { hidden: true })).toHaveLength(1);
+  });
+
+  it('keeps the existing storage and column notices announcing themselves', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(STORAGE_KEY, '{not json');
+    render(<KanbanBoard />);
+
+    // The storage notice keeps its own region, exactly as it had before this work.
+    const regions = await screen.findAllByRole('status');
+    expect(regions.some((region) => /could not be read/i.test(region.textContent ?? ''))).toBe(true);
+
+    await user.click(screen.getByRole('button', { name: 'Delete Backlog column' }));
+    const after = await screen.findAllByRole('status');
+    expect(after.some((region) => /still has 2 cards/i.test(region.textContent ?? ''))).toBe(true);
+  });
+});
+
+describe('KanbanBoard column collapse', () => {
+  it('collapses a column without hiding its count', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    const todo = await screen.findByLabelText('To Do column');
+
+    await user.click(within(todo).getByRole('button', { name: 'Collapse To Do column' }));
+
+    // The header survives, so the count is still readable: collapsing must never
+    // hide how full a bay is.
+    expect(within(todo).getByTitle('3 of 3 cards')).toBeInTheDocument();
+    expect(within(todo).queryByRole('group', { name: 'Plan weekly groceries' })).not.toBeInTheDocument();
+  });
+
+  it('keeps a collapsed column limit and its saturation readable', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    const todo = await screen.findByLabelText('To Do column');
+
+    await user.click(within(todo).getByRole('button', { name: 'Set Work In Progress limit for To Do' }));
+    await user.type(screen.getByLabelText('Work In Progress limit for To Do'), '2');
+    await user.keyboard('{Enter}');
+    await user.click(within(todo).getByRole('button', { name: 'Collapse To Do column' }));
+
+    expect(within(todo).getByTitle(/over the Work In Progress limit/i)).toHaveTextContent('3/2');
+    expect(within(todo).getByText('Over')).toBeInTheDocument();
+  });
+
+  it('states collapse in the accessible name and expanded state, not a chevron alone', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    const todo = await screen.findByLabelText('To Do column');
+
+    const control = within(todo).getByRole('button', { name: 'Collapse To Do column' });
+    expect(control).toHaveAttribute('aria-expanded', 'true');
+
+    await user.click(control);
+    const collapsedControl = within(todo).getByRole('button', { name: 'Expand To Do column' });
+    expect(collapsedControl).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('expands without a pointer', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    const todo = await screen.findByLabelText('To Do column');
+
+    await user.click(within(todo).getByRole('button', { name: 'Collapse To Do column' }));
+    todo.focus();
+    await user.keyboard('{Enter}');
+
+    expect(await within(todo).findByRole('group', { name: 'Plan weekly groceries' })).toBeInTheDocument();
+  });
+
+  it('remembers a collapsed column across a reload, without touching the board', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<KanbanBoard />);
+    const todo = await screen.findByLabelText('To Do column');
+    await user.click(within(todo).getByRole('button', { name: 'Collapse To Do column' }));
+    await waitFor(() => expect(window.localStorage.getItem(COLLAPSED_COLUMNS_KEY)).toContain('column-todo'));
+
+    const boardBefore = window.localStorage.getItem(STORAGE_KEY);
+    unmount();
+    render(<KanbanBoard />);
+
+    const reloaded = await screen.findByLabelText('To Do column');
+    expect(within(reloaded).getByRole('button', { name: 'Expand To Do column' })).toBeInTheDocument();
+    // The preference is stored apart from the board, so the board is byte-identical.
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBe(boardBefore);
+  });
+});
+
+describe('KanbanBoard bulk move', () => {
+  const selectCards = async (user: ReturnType<typeof userEvent.setup>, titles: string[]) => {
+    for (const title of titles) {
+      await user.click(screen.getByRole('checkbox', { name: `Select ${title}` }));
+    }
+  };
+
+  const stripNamesIn = (bay: string): string[] =>
+    within(screen.getByLabelText(bay))
+      .queryAllByRole('group')
+      .map((strip) => strip.getAttribute('aria-label') ?? '');
+
+  it('shows nothing to bulk-move until something is selected', async () => {
+    render(<KanbanBoard />);
+    await screen.findByLabelText('Backlog column');
+    expect(screen.queryByRole('button', { name: /Move \d+ selected cards/ })).not.toBeInTheDocument();
+  });
+
+  it('moves several selected cards at once, preserving their relative order', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await selectCards(user, ['Organize reading list', 'Plan weekly groceries', 'Book dentist appointment']);
+    await user.click(screen.getByRole('button', { name: 'Move 3 selected cards to In Progress' }));
+
+    // Selected in the order reading-list, groceries, dentist; stored order follows it.
+    expect(stripNamesIn('To Do column')).toEqual([]);
+    expect(stripNamesIn('In Progress column')).toEqual([
+      'Refresh portfolio case study',
+      'Prepare laundry schedule',
+      'Organize reading list',
+      'Plan weekly groceries',
+      'Book dentist appointment',
+    ]);
+  });
+
+  it('clears the selection once the move is done', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await selectCards(user, ['Organize reading list']);
+    await user.click(screen.getByRole('button', { name: 'Move 1 selected cards to In Progress' }));
+
+    expect(screen.queryByRole('button', { name: /selected cards/ })).not.toBeInTheDocument();
+  });
+
+  it('obeys the same Work In Progress limit as a single move', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    // In Progress holds two cards, so a limit of two admits nothing.
+    await user.click(screen.getByRole('button', { name: 'Set Work In Progress limit for In Progress' }));
+    await user.type(screen.getByLabelText('Work In Progress limit for In Progress'), '2');
+    await user.keyboard('{Enter}');
+
+    await selectCards(user, ['Organize reading list', 'Plan weekly groceries']);
+    await user.click(screen.getByRole('button', { name: 'Move 2 selected cards to In Progress' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/at its Work In Progress limit of 2/i);
+    expect(stripNamesIn('To Do column')).toEqual([
+      'Plan weekly groceries',
+      'Book dentist appointment',
+      'Organize reading list',
+    ]);
+  });
+
+  it('refuses the whole group rather than part of it', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+    const todoBefore = stripNamesIn('To Do column');
+
+    // Backlog already holds two cards, so a limit of two admits nothing at all.
+    await user.click(screen.getByRole('button', { name: 'Set Work In Progress limit for Backlog' }));
+    await user.type(screen.getByLabelText('Work In Progress limit for Backlog'), '2');
+    await user.keyboard('{Enter}');
+
+    await selectCards(user, ['Book dentist appointment', 'Organize reading list']);
+    await user.click(screen.getByRole('button', { name: 'Move 2 selected cards to Backlog' }));
+
+    // A partial move would leave the board holding some of what was asked for and
+    // none of the rest, with no way for the person to tell which.
+    expect(stripNamesIn('Backlog column')).toEqual(['Research personal finance apps', 'Set up photo backup']);
+    expect(stripNamesIn('To Do column')).toEqual(todoBefore);
+    expect(await screen.findByRole('status')).toHaveTextContent(/at its Work In Progress limit of 2/i);
+  });
+
+  it('clears a selection without moving anything', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+    const before = stripNamesIn('To Do column');
+
+    await selectCards(user, ['Plan weekly groceries']);
+    await user.click(screen.getByRole('button', { name: 'Clear selection' }));
+
+    expect(screen.queryByRole('button', { name: /selected cards/ })).not.toBeInTheDocument();
+    expect(stripNamesIn('To Do column')).toEqual(before);
+  });
+
+  it('never writes selection into saved data', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await selectCards(user, ['Plan weekly groceries']);
+
+    const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}');
+    expect(JSON.stringify(saved)).not.toContain('selected');
+    expect(saved.cards['card-groceries'].title).toBe('Plan weekly groceries');
+  });
+
+  it('forgets a selected card when it is deleted', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await selectCards(user, ['Plan weekly groceries']);
+    await user.click(screen.getByRole('button', { name: 'Delete Plan weekly groceries' }));
+
+    // Leaving a deleted card in the selection would let it be "moved" to nowhere.
+    expect(screen.queryByRole('button', { name: /selected cards/ })).not.toBeInTheDocument();
+  });
+
+  it('states selection in words as well as a checked box', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await selectCards(user, ['Plan weekly groceries']);
+
+    const strip = screen.getByRole('group', { name: 'Plan weekly groceries' });
+    expect(within(strip).getByRole('checkbox', { name: 'Select Plan weekly groceries' })).toBeChecked();
+    // The word is what carries the state in greyscale; the tint alone would not.
+    expect(within(strip).getByText('Selected')).toBeInTheDocument();
   });
 });
 

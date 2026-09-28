@@ -32,6 +32,20 @@ export function dayNumberFromString(value: string): number {
   return dayNumber(value);
 }
 
+/**
+ * A filed date, rendered absolutely. The board's due-date treatment is relative
+ * because "1D LATE" is useful for a deadline; the same treatment on a filing time
+ * would be meaningless, so this does not reuse it.
+ */
+export function formatFiledDate(timestamp: number): string {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function formatDueDate(value: string, today = localDateString()): string {
   if (!isValidDateString(value) || !isValidDateString(today)) return value;
   const difference = dayNumber(value) - dayNumber(today);

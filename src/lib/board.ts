@@ -8,9 +8,13 @@ export interface MoveCardOptions {
  * Whether a column is already carrying as much as its Work In Progress limit
  * allows. A column with no limit set is unrestricted, so limits stay opt-in and a
  * stale number can always be cleared.
+ *
+ * `incoming` is how many cards are about to land. A bulk move is checked in
+ * advance, so moving five cards into a column with two free slots is refused in
+ * full rather than accepted and then silently overfilling the column.
  */
-export function isColumnAtLimit(column: ColumnItem): boolean {
-  return column.limit !== undefined && column.cardIds.length >= column.limit;
+export function isColumnAtLimit(column: ColumnItem, incoming = 1): boolean {
+  return column.limit !== undefined && column.cardIds.length + incoming > column.limit;
 }
 
 /**
@@ -53,6 +57,32 @@ export function moveCard(state: BoardState, cardId: string, targetColumnId: stri
       return column;
     }),
   };
+}
+
+/**
+ * Moves several cards into one column as a sequence of the single-card move, so
+ * bulk cannot diverge from single behaviour, cannot bypass the filtered-reorder
+ * rule, and cannot bypass a Work In Progress limit.
+ *
+ * The limit is checked up front for the whole group, because a partial move would
+ * be worse than a refusal: the board would end up holding some of what was asked
+ * for and none of the rest, with no way for the person to tell which.
+ *
+ * The relative order of the moved cards is preserved, so clearing a queue does not
+ * scramble the meaning of the queue.
+ */
+export function moveCardsInto(state: BoardState, cardIds: string[], targetColumnId: string): BoardState {
+  if (cardIds.length === 0) return state;
+  const target = state.columns.find((column) => column.id === targetColumnId);
+  if (!target) return state;
+
+  // Only cards that are actually moving count against the limit, and only those
+  // are moved. Re-issuing the move for a card already in the target would append
+  // it to its own column and quietly reorder work that was never asked to move.
+  const arriving = cardIds.filter((id) => !target.cardIds.includes(id));
+  if (isColumnAtLimit(target, arriving.length)) return state;
+
+  return arriving.reduce((current, cardId) => moveCard(current, cardId, targetColumnId), state);
 }
 
 /** The column a card would land in, so a caller can explain a refusal before attempting it. */

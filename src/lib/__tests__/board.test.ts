@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addCard, isColumnAtLimit, isColumnOverLimit, isFilterActive, moveCard, moveCardToAdjacentColumn, moveCardWithinColumn, moveColumnToAdjacent, pruneExpandedIds, removeCard, resolveInsertAfter, updateCard } from '../board';
+import { addCard, isColumnAtLimit, isColumnOverLimit, isFilterActive, moveCard, moveCardToAdjacentColumn, moveCardWithinColumn, moveCardsInto, moveColumnToAdjacent, pruneExpandedIds, removeCard, resolveInsertAfter, updateCard } from '../board';
 import type { BoardState, CardDraft, CardItem, ColumnItem } from '../../types/kanban';
 
 function board(): BoardState {
@@ -192,6 +192,84 @@ describe('isFilterActive', () => {
     expect(isFilterActive('   ', 'all')).toBe(false);
     expect(isFilterActive('tax', 'all')).toBe(true);
     expect(isFilterActive('', 'high')).toBe(true);
+  });
+});
+
+describe('moveCardsInto', () => {
+  // A dedicated fixture, because a column cannot be added to the shared one without
+  // putting a card in two columns at once, which is not a board the board would load.
+  function threeColumns(): BoardState {
+    const state = board();
+    state.columns = [
+      { id: 'col-1', title: 'One', cardIds: ['a', 'b', 'e'] },
+      { id: 'col-2', title: 'Two', cardIds: ['c', 'd'] },
+      { id: 'col-3', title: 'Three', cardIds: [] },
+    ];
+    return state;
+  }
+
+  it('moves several cards at once, preserving their relative order', () => {
+    const moved = moveCardsInto(board(), ['a', 'b', 'e'], 'col-2');
+    expect(ids(moved, 'col-1')).toEqual([]);
+    expect(ids(moved, 'col-2')).toEqual(['c', 'd', 'a', 'b', 'e']);
+  });
+
+  it('leaves the board alone when there is no target column', () => {
+    const state = board();
+    expect(moveCardsInto(state, [], 'col-2')).toBe(state);
+    expect(moveCardsInto(state, ['a', 'b'], 'missing')).toBe(state);
+  });
+
+  it('refuses the whole group rather than part of it', () => {
+    const state = threeColumns();
+    state.columns[2] = { ...(state.columns[2] as ColumnItem), limit: 1 };
+    // One card fits, two do not. Accepting one of two would leave the board holding
+    // some of what was asked for and none of the rest, with no way to tell which.
+    expect(ids(moveCardsInto(state, ['a'], 'col-3'), 'col-3')).toEqual(['a']);
+    expect(ids(moveCardsInto(state, ['b', 'c'], 'col-3'), 'col-3')).toEqual([]);
+  });
+
+  it('leaves every card where it was after a refusal', () => {
+    const state = threeColumns();
+    state.columns[2] = { ...(state.columns[2] as ColumnItem), limit: 1 };
+    moveCardsInto(state, ['a', 'b'], 'col-3');
+    expect(ids(state, 'col-1')).toEqual(['a', 'b', 'e']);
+    expect(ids(state, 'col-3')).toEqual([]);
+  });
+
+  it('moves a group into a column that already holds one of them, without disturbing it', () => {
+    const state = threeColumns();
+    // 'c' moves out of col-2 into the target, so it is named there and nowhere else:
+    // a card in two columns at once is not a board the board would load.
+    state.columns[1] = { ...(state.columns[1] as ColumnItem), cardIds: ['d'] };
+    state.columns[2] = { ...(state.columns[2] as ColumnItem), cardIds: ['c'], limit: 3 };
+
+    const moved = moveCardsInto(state, ['a', 'c'], 'col-3');
+
+    // 'c' was already there and keeps its place, ahead of the arriving card, and the
+    // column it left does not still claim it.
+    expect(ids(moved, 'col-3')).toEqual(['c', 'a']);
+    expect(ids(moved, 'col-2')).toEqual(['d']);
+    expect(ids(moved, 'col-1')).toEqual(['b', 'e']);
+  });
+
+  it('obeys the same limit as a single move, with no way around it', () => {
+    const state = threeColumns();
+    state.columns[2] = { ...(state.columns[2] as ColumnItem), limit: 0 };
+    // Both the single move and the two-card move are refused, because bulk is not a
+    // route around the rule.
+    expect(ids(moveCard(state, 'a', 'col-3'), 'col-3')).toEqual([]);
+    expect(ids(moveCardsInto(state, ['a', 'b'], 'col-3'), 'col-3')).toEqual([]);
+  });
+
+  it('lets a group through when it fits, and refuses it when it does not', () => {
+    const fitting = threeColumns();
+    fitting.columns[2] = { ...(fitting.columns[2] as ColumnItem), limit: 2 };
+    expect(ids(moveCardsInto(fitting, ['a', 'b'], 'col-3'), 'col-3')).toEqual(['a', 'b']);
+
+    const tooMany = threeColumns();
+    tooMany.columns[2] = { ...(tooMany.columns[2] as ColumnItem), limit: 2 };
+    expect(ids(moveCardsInto(tooMany, ['a', 'b', 'e'], 'col-3'), 'col-3')).toEqual([]);
   });
 });
 

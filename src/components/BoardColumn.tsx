@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { IconArrowLeft, IconArrowRight, IconCheck, IconGauge, IconPlus, IconTrash, IconX } from '@tabler/icons-react';
+import { IconArrowLeft, IconArrowRight, IconCheck, IconChevronDown, IconChevronRight, IconGauge, IconPlus, IconTrash, IconX } from '@tabler/icons-react';
 import { Fragment, useEffect, useRef } from 'react';
 import type { DragEvent, KeyboardEvent, RefObject } from 'react';
 import { useMotionTransition } from '@/hooks/useMotionTransition';
@@ -46,6 +46,10 @@ interface BoardColumnProps {
   onSaveCardDraft: (cardId: string, draft: CardDraft) => void;
   onCancelEditCard: () => void;
   onMoveColumn: (direction: 'left' | 'right') => void;
+  selectedIds: ReadonlySet<string>;
+  onToggleSelected: (id: string) => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
   settingLimit: boolean;
   limitValue: string;
   onStartLimit: () => void;
@@ -63,7 +67,7 @@ interface BoardColumnProps {
   onDrop: (event: DragEvent<HTMLElement>, cardId?: string) => void;
 }
 
-export function BoardColumn({ column, cards, activeForm, renaming, renameValue, draggedCardId, dropTarget, positionalEnabled, canMoveLeft, canMoveRight, onStartCardForm, onSaveCard, onCancelCardForm, onBeginRename, onRenameChange, onSaveRename, onCancelRename, onDeleteColumn, onDeleteCard, onEditCard, editingCardId, onSaveCardDraft, onCancelEditCard, onMoveColumn, settingLimit, limitValue, onStartLimit, onLimitChange, onSaveLimit, onCancelLimit, onMove, expandedIds, onToggleExpanded, onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop }: BoardColumnProps): JSX.Element {
+export function BoardColumn({ column, cards, activeForm, renaming, renameValue, draggedCardId, dropTarget, positionalEnabled, canMoveLeft, canMoveRight, onStartCardForm, onSaveCard, onCancelCardForm, onBeginRename, onRenameChange, onSaveRename, onCancelRename, onDeleteColumn, onDeleteCard, onEditCard, editingCardId, onSaveCardDraft, onCancelEditCard, onMoveColumn, selectedIds, onToggleSelected, collapsed, onToggleCollapsed, settingLimit, limitValue, onStartLimit, onLimitChange, onSaveLimit, onCancelLimit, onMove, expandedIds, onToggleExpanded, onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop }: BoardColumnProps): JSX.Element {
   const renameRef = useRef<HTMLInputElement>(null);
   const limitRef = useRef<HTMLInputElement>(null);
   const transition = useMotionTransition();
@@ -74,6 +78,10 @@ export function BoardColumn({ column, cards, activeForm, renaming, renameValue, 
   const showColumnDropIndicator = Boolean(draggedCardId && dropTarget?.columnId === column.id && !dropTarget.cardId);
   const hasLimit = column.limit !== undefined;
   const overLimit = isColumnOverLimit(column, cards.length);
+  // A collapsed bay keeps its header, so the count and the limit stay readable and
+  // collapsing can never hide saturation. `aria-expanded` carries the state, not the
+  // chevron, so it survives greyscale.
+  const bodyId = `${column.id}-body`;
   // Over-limit is stated in words, never by hue alone, so the signal survives
   // greyscale and colour blindness.
   const countLabel = hasLimit ? `${cards.length}/${column.limit}` : String(cards.length);
@@ -88,11 +96,12 @@ export function BoardColumn({ column, cards, activeForm, renaming, renameValue, 
       {settingLimit
         ? <Input ref={limitRef} type="number" min={0} value={limitValue} onChange={(event) => onLimitChange(event.target.value)} onBlur={onSaveLimit} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key === 'Enter') onSaveLimit(); if (event.key === 'Escape') onCancelLimit(); }} aria-label={`Work In Progress limit for ${column.title}`} title="Leave empty for no limit" className="h-7 w-16 shrink-0 px-1 text-center font-mono text-xs" />
         : <><span title={countTitle} className={cn('shrink-0 font-mono text-xs tabular-nums', overLimit ? 'text-hold' : 'text-muted')}>{countLabel}</span>{overLimit && <span className="shrink-0 font-mono text-[11px] uppercase tracking-wide text-hold">Over</span>}<Button variant="ghost" size="icon" onClick={onStartLimit} aria-label={`Set Work In Progress limit for ${column.title}`} title={hasLimit ? `Limit ${column.limit}` : 'No limit set'} className="h-7 w-7 text-faint"><IconGauge size={14} stroke={1.5} /></Button></>}
+      <Button variant="ghost" size="icon" onClick={onToggleCollapsed} aria-expanded={!collapsed} aria-controls={bodyId} aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${column.title} column`} title={collapsed ? 'Expand column' : 'Collapse column'} className="h-7 w-7 text-faint">{collapsed ? <IconChevronRight size={14} stroke={1.5} /> : <IconChevronDown size={14} stroke={1.5} />}</Button>
       <Button variant="ghost" size="icon" onClick={() => onMoveColumn('left')} disabled={!canMoveLeft} aria-label={`Move ${column.title} column left`} title="Move column left" className="h-7 w-7 text-faint"><IconArrowLeft size={14} stroke={1.5} /></Button>
       <Button variant="ghost" size="icon" onClick={() => onMoveColumn('right')} disabled={!canMoveRight} aria-label={`Move ${column.title} column right`} title="Move column right" className="h-7 w-7 text-faint"><IconArrowRight size={14} stroke={1.5} /></Button>
       <Button variant="destructive" size="icon" onClick={onDeleteColumn} aria-label={`Delete ${column.title} column`} title={total > 0 ? 'Only empty columns can be deleted' : 'Delete column'} className="h-7 w-7"><IconTrash size={14} stroke={1.5} /></Button>
     </div>
-    <div className="py-1" onDragLeave={onDragLeave}><AnimatePresence initial={false}>{showColumnDropIndicator && <motion.div key="column-drop" initial={{ opacity: 0, scaleY: 0.6 }} animate={{ opacity: 1, scaleY: 1 }} exit={{ opacity: 0, scaleY: 0.6 }} transition={transition} className={dropPlaceholderClass} aria-hidden="true" />}{cards.map((card) => {
+    <div id={bodyId} hidden={collapsed} className="py-1" onDragLeave={onDragLeave}><AnimatePresence initial={false}>{showColumnDropIndicator && <motion.div key="column-drop" initial={{ opacity: 0, scaleY: 0.6 }} animate={{ opacity: 1, scaleY: 1 }} exit={{ opacity: 0, scaleY: 0.6 }} transition={transition} className={dropPlaceholderClass} aria-hidden="true" />}{cards.map((card) => {
       const index = column.cardIds.indexOf(card.id);
       const canMoveUp = positionalEnabled && index > 0;
       const canMoveDown = positionalEnabled && index >= 0 && index < total - 1;
@@ -100,9 +109,9 @@ export function BoardColumn({ column, cards, activeForm, renaming, renameValue, 
       const dropAfter = positionalEnabled && dropTarget?.columnId === column.id && dropTarget.cardId === card.id && dropTarget.insertAfter;
       return <Fragment key={card.id}>{editingCardId === card.id
         ? <CardForm key="edit" mode="edit" initialDraft={cardToDraft(card)} onSave={(draft) => onSaveCardDraft(card.id, draft)} onCancel={onCancelEditCard} />
-        : <KanbanCard card={card} done={isDone} overdue={isCardOverdue(card, isDone)} expanded={expandedIds.has(card.id)} canMoveUp={canMoveUp} canMoveDown={canMoveDown} canMoveLeft={canMoveLeft} canMoveRight={canMoveRight} onDelete={onDeleteCard} onEdit={onEditCard} onToggleExpanded={onToggleExpanded} onMove={onMove} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragOver={(event, id) => onDragOver(event, id)} onDragEnter={(event, id) => onDragEnter(event, id)} onDragLeave={onDragLeave} onDrop={(event, id) => onDrop(event, id)} dropIndicator={dropBefore} />}{dropAfter && <motion.div initial={{ opacity: 0, scaleY: 0.6 }} animate={{ opacity: 1, scaleY: 1 }} transition={transition} className={cn(dropPlaceholderClass, 'my-0.5')} aria-hidden="true" />}</Fragment>;
+        : <KanbanCard card={card} done={isDone} overdue={isCardOverdue(card, isDone)} expanded={expandedIds.has(card.id)} canMoveUp={canMoveUp} canMoveDown={canMoveDown} canMoveLeft={canMoveLeft} canMoveRight={canMoveRight} onDelete={onDeleteCard} onEdit={onEditCard} selected={selectedIds.has(card.id)} onToggleSelected={onToggleSelected} onToggleExpanded={onToggleExpanded} onMove={onMove} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragOver={(event, id) => onDragOver(event, id)} onDragEnter={(event, id) => onDragEnter(event, id)} onDragLeave={onDragLeave} onDrop={(event, id) => onDrop(event, id)} dropIndicator={dropBefore} />}{dropAfter && <motion.div initial={{ opacity: 0, scaleY: 0.6 }} animate={{ opacity: 1, scaleY: 1 }} transition={transition} className={cn(dropPlaceholderClass, 'my-0.5')} aria-hidden="true" />}</Fragment>;
     })}</AnimatePresence>{total === 0 && !activeForm && <p className={emptyBay}>No strips in this bay. File the first card.</p>}{total > 0 && cards.length === 0 && <p className={emptyBay}>No strips match the filter.</p>}</div>
-    <AnimatePresence initial={false} mode="popLayout">{activeForm ? <CardForm key="form" onSave={onSaveCard} onCancel={onCancelCardForm} /> : <Button key="add" variant="outline" onClick={onStartCardForm} className={cn('mt-2 w-full justify-start border-dashed font-mono text-[11px] uppercase tracking-wide', 'text-muted')}><IconPlus size={13} stroke={1.5} /> File card</Button>}</AnimatePresence>
+    <AnimatePresence initial={false} mode="popLayout">{!collapsed && (activeForm ? <CardForm key="form" onSave={onSaveCard} onCancel={onCancelCardForm} /> : <Button key="add" variant="outline" onClick={onStartCardForm} className={cn('mt-2 w-full justify-start border-dashed font-mono text-[11px] uppercase tracking-wide', 'text-muted')}><IconPlus size={13} stroke={1.5} /> File card</Button>)}</AnimatePresence>
   </motion.section>;
 }
 
