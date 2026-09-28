@@ -25,12 +25,14 @@
      base, surface and surface-2 alike. An opaque grey cannot do that across a
      ramp. The ladder is split by purpose, because WCAG 1.4.11 asks 3:1 only of
      boundaries needed to identify a control — not of decorative row rules.
-       line        1.55:1 on base  decorative separators and panel frames
-       line-control 3.14:1        input/select/textarea boundaries
-       line-strong 3.94:1         outline buttons and drop affordances */
-  --color-border: rgb(255 255 255 / 0.18);
-  --color-border-control: rgb(255 255 255 / 0.36);
-  --color-border-strong: rgb(255 255 255 / 0.42);
+     Each rung declares its purpose so the token guard can hold it to the floor
+     that purpose implies, and so a new rung cannot be added unmeasured.
+       line        1.54:1 on base  decorative separators and panel frames
+       line-control 3.13:1        input/select/textarea boundaries
+       line-strong 3.95:1         outline buttons and drop affordances */
+  --color-border: rgb(255 255 255 / 0.18); /* purpose: decorative */
+  --color-border-control: rgb(255 255 255 / 0.36); /* purpose: control */
+  --color-border-strong: rgb(255 255 255 / 0.42); /* purpose: emphasis */
   --color-accent: #efad32;
   --color-accent: oklch(0.79 0.15 78);
   --color-accent-fg: #000000;

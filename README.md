@@ -22,6 +22,12 @@ The board persists its state in `localStorage` under `noir_kanban_state`. There 
 
 `DESIGN.md` is the source of truth for the visual system: the palette and its measured contrast table, the type pairing, motion, and the accessibility bar. Change the tokens in `src/styles/index.css` rather than the components, and keep the hex fallback derived from the OKLCH value beside it.
 
+A test suite keeps the palette, the border ladder, and those documented figures honest against the tokens themselves, so the document cannot drift from what a browser renders. Where a test belongs is stated in `src/test/setup.ts`, and it is worth reading before adding one.
+
+## Environment
+
+A change to `tailwind.config.ts` does not reliably rebuild the dev server. Restart `npm run dev` after editing it, or a correct change can appear not to have applied.
+
 ## Planning
 
 Issues and specs live in GitHub Issues. See `docs/agents/issue-tracker.md` for the `gh` conventions and `docs/agents/triage-labels.md` for the triage vocabulary. Architecture decisions live in `docs/adr/`.
