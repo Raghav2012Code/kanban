@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { isValidBoard, loadBoardState, persistBoardState } from '../lib/persistence';
+import { createLocalBoardStore } from '../lib/board-store';
+import { isValidBoard } from '../lib/persistence';
 import type { BoardState } from '../types/kanban';
 
 /** Bounded so memory cannot grow without limit. */
@@ -32,7 +33,10 @@ export interface UseKanbanBoardResult {
 }
 
 export function useKanbanBoard(): UseKanbanBoardResult {
-  const [initial] = useState(() => loadBoardState());
+  // Everything the board touches goes through the store, so nothing above this hook
+  // knows whether the board is local or shared.
+  const [store] = useState(createLocalBoardStore);
+  const [initial] = useState(() => store.read());
   // One object rather than three states, so a mutation and its history entry are
   // applied atomically and cannot be recorded twice or half-written.
   const [state, setState] = useState<BoardHistory>(() => ({ board: initial.board, past: [], future: [] }));
@@ -44,9 +48,9 @@ export function useKanbanBoard(): UseKanbanBoardResult {
   const dismissedKinds = useRef<Set<StorageWarning['kind']>>(new Set());
 
   useEffect(() => {
-    const result = persistBoardState(state.board);
+    const result = store.write(state.board);
     if (!result.ok && !dismissedKinds.current.has(result.reason)) setStorageWarning({ kind: result.reason });
-  }, [state.board]);
+  }, [state.board, store]);
 
   const mutate = useCallback((updater: (current: BoardState) => BoardState) => {
     setState((current) => {
