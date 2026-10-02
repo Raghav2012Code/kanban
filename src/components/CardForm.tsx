@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
 import { useMotionTransition } from '@/hooks/useMotionTransition';
 import { normalizeCardDraft, validateDueDate } from '@/lib/validation';
@@ -21,7 +21,7 @@ interface CardFormProps {
   mode?: CardFormMode;
 }
 
-export function CardForm({ onSave, onCancel, initialDraft, mode = 'file' }: CardFormProps): JSX.Element {
+export const CardForm = forwardRef<HTMLFormElement, CardFormProps>(function CardForm({ onSave, onCancel, initialDraft, mode = 'file' }: CardFormProps, ref): JSX.Element {
   const [draft, setDraft] = useState<CardDraft>(() => initialDraft ?? emptyDraft);
   const [error, setError] = useState<string | null>(null);
   const [pastConfirmed, setPastConfirmed] = useState(false);
@@ -43,7 +43,7 @@ export function CardForm({ onSave, onCancel, initialDraft, mode = 'file' }: Card
   // second card being filed, so the two paths cannot be confused at a glance.
   const caption = editing ? 'Edit card' : 'File card';
   const submitLabel = editing ? 'Save changes' : 'Save card';
-  return <motion.form aria-label={caption} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={transition} onSubmit={submit} onKeyDown={(event: KeyboardEvent<HTMLFormElement>) => { if (event.key === 'Escape') onCancel(); }} className="space-y-2.5 overflow-hidden rounded-strip border border-line bg-surface p-3">
+  return <motion.form ref={ref} aria-label={caption} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={transition} onSubmit={submit} onKeyDown={(event: KeyboardEvent<HTMLFormElement>) => { if (event.key === 'Escape') onCancel(); }} className="space-y-2.5 overflow-hidden rounded-strip border border-line bg-surface p-3">
     <p className="font-mono text-[11px] uppercase leading-5 tracking-wide text-muted">{caption}</p>
     <div className="space-y-1"><label htmlFor="card-title" className="block font-mono text-[11px] uppercase tracking-wide text-muted">Card title</label><Input id="card-title" ref={titleRef} value={draft.title} onChange={(event) => update({ title: event.target.value })} aria-label="Card title" /></div>
     <div className="grid grid-cols-2 gap-2">
@@ -54,4 +54,6 @@ export function CardForm({ onSave, onCancel, initialDraft, mode = 'file' }: Card
     {error && <p role="alert" className="font-mono text-[11px] uppercase leading-5 tracking-wide text-warn">{error}</p>}
     <div className="flex justify-end gap-2"><Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button><Button type="submit" size="sm">{pastConfirmed && pastDate ? 'Save anyway' : submitLabel}</Button></div>
   </motion.form>;
-}
+});
+
+CardForm.displayName = 'CardForm';

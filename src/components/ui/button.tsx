@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from 'react';
+import { forwardRef, type ButtonHTMLAttributes } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
@@ -21,8 +21,13 @@ const buttonVariants = cva('inline-flex items-center justify-center gap-1.5 roun
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {}
 
-export function Button({ className, variant, size, type = 'button', ...props }: ButtonProps): JSX.Element {
-  return <button type={type} className={cn(buttonVariants({ variant, size, className }))} {...props} />;
-}
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { className, variant, size, type = 'button', ...props },
+  ref,
+): JSX.Element {
+  return <button ref={ref} type={type} className={cn(buttonVariants({ variant, size, className }))} {...props} />;
+});
+
+Button.displayName = 'Button';
 
 export { buttonVariants };
