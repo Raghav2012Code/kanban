@@ -105,9 +105,9 @@ export function KanbanCard({ card, done, overdue, expanded, canMoveUp, canMoveDo
         </div>
       </div>
       <div className={cn('flex items-center justify-end gap-0.5', '[@media(hover:hover)]:absolute [@media(hover:hover)]:right-1.5 [@media(hover:hover)]:top-1.5 [@media(hover:hover)]:rounded-strip [@media(hover:hover)]:border [@media(hover:hover)]:border-line [@media(hover:hover)]:bg-raised [@media(hover:hover)]:px-0.5', revealControl)}>
-        {moveControls.map(({ direction, label, Icon, can }) => <Button key={direction} variant="ghost" size="icon" onClick={() => onMove(card.id, direction)} disabled={!canMove[can]} aria-label={`Move ${card.title} ${label}`} className="h-7 w-7 text-faint"><Icon size={14} stroke={1.5} /></Button>)}
-        <Button variant="ghost" size="icon" onClick={() => onEdit(card.id)} aria-label={`Edit ${card.title}`} className="h-7 w-7 text-faint"><IconPencil size={14} stroke={1.5} /></Button>
-        <Button variant="destructive" size="icon" onClick={() => onDelete(card.id)} aria-label={`Delete ${card.title}`} className="h-7 w-7"><IconTrash size={14} stroke={1.5} /></Button>
+        {moveControls.map(({ direction, label, Icon, can }) => <Button key={direction} variant="ghost" size="icon" onClick={() => onMove(card.id, direction)} disabled={!canMove[can]} aria-label={`Move ${card.title} ${label}`} title={`Move ${label}`} className="h-7 w-7 text-faint"><Icon size={14} stroke={1.5} /></Button>)}
+        <Button variant="ghost" size="icon" onClick={() => onEdit(card.id)} aria-label={`Edit ${card.title}`} title="Edit card" className="h-7 w-7 text-faint"><IconPencil size={14} stroke={1.5} /></Button>
+        <Button variant="destructive" size="icon" onClick={() => onDelete(card.id)} aria-label={`Delete ${card.title}`} title="Delete card" className="h-7 w-7"><IconTrash size={14} stroke={1.5} /></Button>
       </div>
     </motion.div>
   </>;

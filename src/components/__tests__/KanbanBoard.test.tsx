@@ -78,7 +78,7 @@ describe('KanbanBoard filtered move safety', () => {
     const board = createSeedState(new Date(2026, 8, 25));
     board.cards['card-tax'] = { ...board.cards['card-tax'], dueDate: '2000-01-01' };
     board.cards['card-research'] = { ...board.cards['card-research'], dueDate: '2000-01-01' };
-    board.cards['card-books'] = { ...board.cards['card-books'], dueDate: '2026-09-27' };
+    board.cards['card-books'] = { ...board.cards['card-books'], dueDate: '2026-09-27', createdAt: Date.now() };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
   }
 
