@@ -1,0 +1,3 @@
+## 2025-05-18 - Controlled Form Title Validation and Focus Management
+**Learning:** Submitting forms without title validation feedback causes silent failures where users (especially screen reader users) don't know why form submission failed. Using `aria-required="true"` along with `role="alert"` and focusing the invalid field provides immediate feedback without triggering disruptive native browser tooltips that bypass controlled React submission handlers.
+**Action:** When validating required fields in React components, set explicit inline error alerts with `role="alert"`, programmatic focus management (`elementRef.focus()`), and `aria-required="true"` instead of standard HTML5 `required` attribute.
