@@ -36,4 +36,14 @@ describe('CardForm', () => {
     await user.click(screen.getByRole('button', { name: 'Save anyway' }));
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ title: 'Task', dueDate: '2000-01-01' }));
   });
+
+  it('shows error message and focuses input when submitting an empty title', async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    render(<CardForm onSave={onSave} onCancel={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: 'Save card' }));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/card title is required/i);
+    expect(screen.getByLabelText('Card title')).toHaveFocus();
+  });
 });
