@@ -501,6 +501,29 @@ describe('KanbanBoard filtering and sorting', () => {
     expect(stripNamesIn('Backlog column')).toEqual([]);
   });
 
+  it('clears search input via clear button and Escape key', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    const searchInput = screen.getByLabelText('Search cards by title or description');
+    await user.type(searchInput, 'groceries');
+    expect(searchInput).toHaveValue('groceries');
+    expect(stripNamesIn('To Do column')).toEqual(['Plan weekly groceries']);
+
+    // Clear search using the clear button
+    const clearButton = screen.getByRole('button', { name: 'Clear search' });
+    await user.click(clearButton);
+    expect(searchInput).toHaveValue('');
+    expect(screen.queryByRole('button', { name: 'Clear search' })).not.toBeInTheDocument();
+
+    // Type again and clear using Escape key
+    await user.type(searchInput, 'groceries');
+    expect(searchInput).toHaveValue('groceries');
+    await user.keyboard('{Escape}');
+    expect(searchInput).toHaveValue('');
+  });
+
   it('sorts by due date without changing what is stored', async () => {
     const user = userEvent.setup();
     // Due dates deliberately disagree with stored order, so the sorted view is

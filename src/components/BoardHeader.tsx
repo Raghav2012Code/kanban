@@ -1,4 +1,4 @@
-import { IconArrowBackUp, IconArrowForwardUp, IconSearch } from '@tabler/icons-react';
+import { IconArrowBackUp, IconArrowForwardUp, IconSearch, IconX } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 import type { PriorityFilter, SortMode } from '../types/kanban';
 import { BoardMark } from '@/components/BoardMark';
@@ -91,10 +91,34 @@ export function BoardHeader({
 
           {selectionBar}
 
-          <label className="relative">
+          <div className="relative flex items-center w-full sm:w-56">
             <IconSearch size={16} stroke={1.5} aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />
-            <Input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Search" aria-label="Search cards by title or description" className="h-9 w-full pl-8 sm:w-56" />
-          </label>
+            <Input
+              value={search}
+              onChange={(event) => onSearchChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' && search) {
+                  event.stopPropagation();
+                  onSearchChange('');
+                }
+              }}
+              placeholder="Search"
+              aria-label="Search cards by title or description"
+              className={cn('h-9 w-full pl-8 sm:w-56', search && 'pr-8')}
+            />
+            {search && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onSearchChange('')}
+                aria-label="Clear search"
+                title="Clear search"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-faint hover:text-ink"
+              >
+                <IconX size={14} stroke={1.5} />
+              </Button>
+            )}
+          </div>
 
           <Input value={columnTitle} onChange={(event) => onColumnTitleChange(event.target.value)} placeholder="Bay" aria-label="Filter by column title" className="h-9 w-full sm:w-32" />
 
