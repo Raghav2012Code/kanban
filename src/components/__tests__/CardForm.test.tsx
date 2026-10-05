@@ -44,6 +44,8 @@ describe('CardForm', () => {
     await user.click(screen.getByRole('button', { name: 'Save card' }));
     expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent(/card title is required/i);
+    expect(screen.getByRole('alert')).toHaveAttribute('id', 'card-form-error');
+    expect(screen.getByLabelText('Card title')).toHaveAttribute('aria-describedby', 'card-form-error');
     expect(screen.getByLabelText('Card title')).toHaveFocus();
   });
 });
