@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import KanbanBoard from '../../KanbanBoard';
@@ -7,7 +7,13 @@ import { createSeedState } from '../../lib/persistence';
 import { addDays, formatFiledDate, localDateString } from '../../lib/dates';
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(2026, 8, 25));
   window.localStorage.clear();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('KanbanBoard storage truthfulness', () => {
