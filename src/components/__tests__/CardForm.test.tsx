@@ -45,6 +45,37 @@ describe('CardForm', () => {
     expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent(/card title is required/i);
     expect(screen.getByLabelText('Card title')).toHaveFocus();
+
+    // The error is described as well as alerted, so a field that regains focus
+    // still explains why the save was refused.
+    const alert = screen.getByRole('alert');
+    expect(screen.getByLabelText('Card title')).toHaveAttribute('aria-describedby', alert.id);
+    expect(document.getElementById(alert.id)).toBe(alert);
+  });
+
+  it('describes a field with its own error, and holds no reference when there is none', async () => {
+    const user = userEvent.setup();
+    render(<CardForm onSave={vi.fn()} onCancel={vi.fn()} />);
+
+    // No error yet: a reference to a missing element would be a dangling idref.
+    expect(screen.getByLabelText('Card title')).not.toHaveAttribute('aria-describedby');
+    expect(screen.getByLabelText('Due date')).not.toHaveAttribute('aria-describedby');
+
+    // A title error describes the title only: announcing "Card title is required"
+    // while the due date has focus would be misleading.
+    await user.click(screen.getByRole('button', { name: 'Save card' }));
+    const titleError = screen.getByRole('alert').id;
+    expect(titleError).not.toBe('');
+    expect(screen.getByLabelText('Card title')).toHaveAttribute('aria-describedby', titleError);
+    expect(screen.getByLabelText('Due date')).not.toHaveAttribute('aria-describedby');
+
+    // A due-date error is the mirror image of it.
+    fireEvent.change(screen.getByLabelText('Due date'), { target: { value: '2000-01-01' } });
+    await user.type(screen.getByLabelText('Card title'), 'Task');
+    await user.click(screen.getByRole('button', { name: 'Save card' }));
+    const dueError = screen.getByRole('alert').id;
+    expect(screen.getByLabelText('Due date')).toHaveAttribute('aria-describedby', dueError);
+    expect(screen.getByLabelText('Card title')).not.toHaveAttribute('aria-describedby');
   });
 
   it('keeps each field id unique across coexisting forms, so no label points at the wrong input', () => {
