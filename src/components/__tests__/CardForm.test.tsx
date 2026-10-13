@@ -46,4 +46,25 @@ describe('CardForm', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/card title is required/i);
     expect(screen.getByLabelText('Card title')).toHaveFocus();
   });
+
+  it('keeps each field id unique across coexisting forms, so no label points at the wrong input', () => {
+    const { container } = render(
+      <>
+        <CardForm onSave={vi.fn()} onCancel={vi.fn()} />
+        <CardForm onSave={vi.fn()} onCancel={vi.fn()} />
+      </>,
+    );
+    const forms = Array.from(container.querySelectorAll('form'));
+    expect(forms).toHaveLength(2);
+
+    const ids = Array.from(container.querySelectorAll<HTMLElement>('[id]')).map((element) => element.id);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    for (const form of forms) {
+      const ownIds = new Set(Array.from(form.querySelectorAll<HTMLElement>('[id]')).map((element) => element.id));
+      for (const label of Array.from(form.querySelectorAll('label[for]'))) {
+        expect(ownIds.has(label.getAttribute('for') ?? '')).toBe(true);
+      }
+    }
+  });
 });

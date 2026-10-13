@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { forwardRef, useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
 import { useMotionTransition } from '@/hooks/useMotionTransition';
 import { normalizeCardDraft, validateDueDate } from '@/lib/validation';
@@ -26,6 +26,10 @@ export const CardForm = forwardRef<HTMLFormElement, CardFormProps>(function Card
   const [error, setError] = useState<string | null>(null);
   const [pastConfirmed, setPastConfirmed] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
+  // Two forms briefly coexist while one exits, so ids must be per-instance or a
+  // label in one form binds to the other form's input.
+  const formId = useId();
+  const fieldId = (name: string) => `${formId}-${name}`;
   const transition = useMotionTransition();
   useEffect(() => { titleRef.current?.focus(); }, []);
   const update = (patch: Partial<CardDraft>) => { setDraft((current) => ({ ...current, ...patch })); setError(null); setPastConfirmed(false); };
@@ -49,12 +53,12 @@ export const CardForm = forwardRef<HTMLFormElement, CardFormProps>(function Card
   const submitLabel = editing ? 'Save changes' : 'Save card';
   return <motion.form ref={ref} aria-label={caption} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={transition} onSubmit={submit} onKeyDown={(event: KeyboardEvent<HTMLFormElement>) => { if (event.key === 'Escape') onCancel(); }} className="space-y-2.5 overflow-hidden rounded-strip border border-line bg-surface p-3">
     <p className="font-mono text-[11px] uppercase leading-5 tracking-wide text-muted">{caption}</p>
-    <div className="space-y-1"><label htmlFor="card-title" className="block font-mono text-[11px] uppercase tracking-wide text-muted">Card title</label><Input id="card-title" ref={titleRef} value={draft.title} onChange={(event) => update({ title: event.target.value })} aria-required="true" aria-invalid={Boolean(error && error.includes('title'))} aria-label="Card title" /></div>
+    <div className="space-y-1"><label htmlFor={fieldId('title')} className="block font-mono text-[11px] uppercase tracking-wide text-muted">Card title</label><Input id={fieldId('title')} ref={titleRef} value={draft.title} onChange={(event) => update({ title: event.target.value })} aria-required="true" aria-invalid={Boolean(error && error.includes('title'))} aria-label="Card title" /></div>
     <div className="grid grid-cols-2 gap-2">
-      <div className="space-y-1"><label htmlFor="card-priority" className="block font-mono text-[11px] uppercase tracking-wide text-muted">Priority</label><Select id="card-priority" value={draft.priority} onChange={(event) => update({ priority: event.target.value as CardDraft['priority'] })} aria-label="Priority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></Select></div>
-      <div className="space-y-1"><label htmlFor="card-due" className="block font-mono text-[11px] uppercase tracking-wide text-muted">Due date</label><Input id="card-due" type="date" value={draft.dueDate} onChange={(event) => update({ dueDate: event.target.value })} aria-label="Due date" className="font-mono text-sm tabular-nums" /></div>
+      <div className="space-y-1"><label htmlFor={fieldId('priority')} className="block font-mono text-[11px] uppercase tracking-wide text-muted">Priority</label><Select id={fieldId('priority')} value={draft.priority} onChange={(event) => update({ priority: event.target.value as CardDraft['priority'] })} aria-label="Priority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></Select></div>
+      <div className="space-y-1"><label htmlFor={fieldId('due')} className="block font-mono text-[11px] uppercase tracking-wide text-muted">Due date</label><Input id={fieldId('due')} type="date" value={draft.dueDate} onChange={(event) => update({ dueDate: event.target.value })} aria-label="Due date" className="font-mono text-sm tabular-nums" /></div>
     </div>
-    <div className="space-y-1"><label htmlFor="card-notes" className="block font-mono text-[11px] uppercase tracking-wide text-muted">Description (optional)</label><Textarea id="card-notes" value={draft.description} onChange={(event) => update({ description: event.target.value })} aria-label="Description" rows={3} /></div>
+    <div className="space-y-1"><label htmlFor={fieldId('notes')} className="block font-mono text-[11px] uppercase tracking-wide text-muted">Description (optional)</label><Textarea id={fieldId('notes')} value={draft.description} onChange={(event) => update({ description: event.target.value })} aria-label="Description" rows={3} /></div>
     {error && <p role="alert" className="font-mono text-[11px] uppercase leading-5 tracking-wide text-warn">{error}</p>}
     <div className="flex justify-end gap-2"><Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button><Button type="submit" size="sm">{pastConfirmed && pastDate ? 'Save anyway' : submitLabel}</Button></div>
   </motion.form>;
