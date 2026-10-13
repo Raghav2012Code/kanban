@@ -264,6 +264,24 @@ describe('KanbanBoard card editing', () => {
     expect(screen.getAllByLabelText('Card title')).toHaveLength(1);
   });
 
+  it('keeps an open edit form when renaming a bay or opening Add bay, which are not card forms', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+
+    // Renaming a bay must not discard work in progress in an open edit form.
+    await user.click(within(await screen.findByRole('group', { name: 'Plan weekly groceries' })).getByRole('button', { name: 'Edit Plan weekly groceries' }));
+    await screen.findByRole('form', { name: 'Edit card' });
+    await user.click(screen.getByRole('button', { name: 'Rename To Do column' }));
+    expect(await screen.findByLabelText('Rename column')).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Edit card' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    // Neither may opening the Add bay form: a bay is not a card.
+    await user.click(screen.getByRole('button', { name: 'Add bay' }));
+    expect(await screen.findByLabelText('New column name')).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Edit card' })).toBeInTheDocument();
+  });
+
   it('cancels the file-card form with Escape, leaving the board with no half-open state', async () => {
     const user = userEvent.setup();
     render(<KanbanBoard />);
