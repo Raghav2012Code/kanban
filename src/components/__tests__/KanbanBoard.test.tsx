@@ -182,6 +182,23 @@ function makeDataTransfer(payload: string): DataTransfer {
 }
 
 describe('KanbanBoard card editing', () => {
+  /**
+   * Opens a card's edit form, clicks File card, and asserts only the file-card
+   * form remains. Localises the same-bay and across-bay regressions to one place.
+   */
+  async function editThenFileCard(
+    user: ReturnType<typeof userEvent.setup>,
+    cardName: string,
+    bay: HTMLElement,
+  ): Promise<void> {
+    await user.click(within(await screen.findByRole('group', { name: cardName })).getByRole('button', { name: `Edit ${cardName}` }));
+    await screen.findByRole('form', { name: 'Edit card' });
+    await user.click(within(bay).getByRole('button', { name: 'File card' }));
+    expect(await screen.findByRole('form', { name: 'File card' })).toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'Edit card' })).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText('Card title')).toHaveLength(1);
+  }
+
   it('edits a card in place, preserving its slot and its filed date', async () => {
     const user = userEvent.setup();
     const board = createSeedState(new Date(2026, 8, 25));
@@ -231,22 +248,12 @@ describe('KanbanBoard card editing', () => {
     const backlog = await screen.findByLabelText('Backlog column');
 
     // Same bay: an edit is open, then File card is clicked in its own bay.
-    await user.click(within(await screen.findByRole('group', { name: 'Plan weekly groceries' })).getByRole('button', { name: 'Edit Plan weekly groceries' }));
-    await screen.findByRole('form', { name: 'Edit card' });
-    await user.click(within(todo).getByRole('button', { name: 'File card' }));
-    expect(await screen.findByRole('form', { name: 'File card' })).toBeInTheDocument();
-    expect(screen.queryByRole('form', { name: 'Edit card' })).not.toBeInTheDocument();
-    expect(document.querySelectorAll('#card-title')).toHaveLength(1);
+    await editThenFileCard(user, 'Plan weekly groceries', todo);
 
     // Across bays: cancelling leaves no half-open state, then the other direction.
     await user.click(within(screen.getByRole('form', { name: 'File card' })).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('form', { name: 'File card' })).not.toBeInTheDocument());
-    await user.click(within(await screen.findByRole('group', { name: 'Plan weekly groceries' })).getByRole('button', { name: 'Edit Plan weekly groceries' }));
-    await screen.findByRole('form', { name: 'Edit card' });
-    await user.click(within(backlog).getByRole('button', { name: 'File card' }));
-    expect(await screen.findByRole('form', { name: 'File card' })).toBeInTheDocument();
-    expect(screen.queryByRole('form', { name: 'Edit card' })).not.toBeInTheDocument();
-    expect(document.querySelectorAll('#card-title')).toHaveLength(1);
+    await editThenFileCard(user, 'Plan weekly groceries', backlog);
 
     // The symmetric path still replaces: opening an edit closes the file-card form.
     await user.click(within(await screen.findByRole('group', { name: 'Plan weekly groceries' })).getByRole('button', { name: 'Edit Plan weekly groceries' }));
@@ -254,7 +261,42 @@ describe('KanbanBoard card editing', () => {
     // The replaced file-card form plays its exit animation before unmounting,
     // so the absence holds once the transition settles rather than instantly.
     await waitFor(() => expect(screen.queryByRole('form', { name: 'File card' })).not.toBeInTheDocument());
-    expect(document.querySelectorAll('#card-title')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Card title')).toHaveLength(1);
+  });
+
+  it('cancels the file-card form with Escape, leaving the board with no half-open state', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    const todo = await screen.findByLabelText('To Do column');
+
+    await user.click(within(todo).getByRole('button', { name: 'File card' }));
+    const form = await screen.findByRole('form', { name: 'File card' });
+    await user.click(within(form).getByLabelText('Card title'));
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => expect(screen.queryByRole('form', { name: 'File card' })).not.toBeInTheDocument());
+    expect(screen.queryByRole('form', { name: 'Edit card' })).not.toBeInTheDocument();
+    // The bay is back to its trigger rather than stuck mid-form.
+    expect(within(todo).getByRole('button', { name: 'File card' })).toBeInTheDocument();
+  });
+
+  it('cancels an edit form without leaving a stale edit target', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+
+    const group = await screen.findByRole('group', { name: 'Plan weekly groceries' });
+    await user.click(within(group).getByRole('button', { name: 'Edit Plan weekly groceries' }));
+    const form = await screen.findByRole('form', { name: 'Edit card' });
+    await user.click(within(form).getByLabelText('Card title'));
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => expect(screen.queryByRole('form', { name: 'Edit card' })).not.toBeInTheDocument());
+    expect(screen.queryByRole('form', { name: 'File card' })).not.toBeInTheDocument();
+
+    // The card is back, and a fresh edit opens rather than reopening a stale target.
+    const restored = await screen.findByRole('group', { name: 'Plan weekly groceries' });
+    await user.click(within(restored).getByRole('button', { name: 'Edit Plan weekly groceries' }));
+    expect(await screen.findByRole('form', { name: 'Edit card' })).toBeInTheDocument();
   });
 
   it('submits an edit with Enter and abandons one with Escape', async () => {
