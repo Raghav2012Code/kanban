@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { IconAlertTriangle, IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowUp, IconChevronDown, IconCheck, IconChevronUp, IconGripVertical, IconPencil, IconTrash } from '@tabler/icons-react';
+import { IconAlertTriangle, IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowUp, IconChevronDown, IconCheck, IconChevronUp, IconCircleCheck, IconGripVertical, IconPencil, IconTrash } from '@tabler/icons-react';
 import type { DragEvent } from 'react';
 import { useMotionTransition } from '@/hooks/useMotionTransition';
 import { formatDueDate, formatFiledDate } from '@/lib/dates';
@@ -16,6 +16,10 @@ interface KanbanCardProps {
   done: boolean;
   overdue: boolean;
   expanded: boolean;
+  /** True while any card is being dragged: the tile goes inert and stops animating. */
+  dragging?: boolean;
+  /** True for the card being dragged: it reads as in flight while its ghost moves. */
+  dragged?: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
   canMoveLeft: boolean;
@@ -31,15 +35,14 @@ interface KanbanCardProps {
   onDragEnd: () => void;
   onDragOver: (event: DragEvent<HTMLElement>, id: string) => void;
   onDragEnter: (event: DragEvent<HTMLElement>, id: string) => void;
-  onDragLeave: (event: DragEvent<HTMLElement>) => void;
   onDrop: (event: DragEvent<HTMLElement>, id: string) => void;
   dropIndicator: boolean;
 }
 
 const revealControl = 'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:group-hover:pointer-events-auto [@media(hover:hover)]:group-focus-within:pointer-events-auto';
 
-/** Shared drop target: a dashed row at strip height, so a drop reads as "a strip lands here". */
-export const dropPlaceholderClass = 'h-9 rounded-strip border border-dashed border-line-strong bg-raised';
+/** Shared drop target: a dashed tile at card height, so a drop reads as "a card lands here". */
+export const dropPlaceholderClass = 'h-16 rounded-ui border border-dashed border-line-strong bg-surface';
 
 const moveControls: { direction: MoveDirection; label: string; Icon: typeof IconArrowUp; can: keyof Pick<KanbanCardProps, 'canMoveUp' | 'canMoveDown' | 'canMoveLeft' | 'canMoveRight'> }[] = [
   { direction: 'up', label: 'up', Icon: IconArrowUp, can: 'canMoveUp' },
@@ -48,18 +51,20 @@ const moveControls: { direction: MoveDirection; label: string; Icon: typeof Icon
   { direction: 'right', label: 'to the next column', Icon: IconArrowRight, can: 'canMoveRight' },
 ];
 
-export function KanbanCard({ card, done, overdue, expanded, canMoveUp, canMoveDown, canMoveLeft, canMoveRight, onDelete, onEdit, selected, onToggleSelected, onToggleExpanded, onMove, onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop, dropIndicator }: KanbanCardProps): JSX.Element {
+export function KanbanCard({ card, done, overdue, expanded, dragging = false, dragged = false, canMoveUp, canMoveDown, canMoveLeft, canMoveRight, onDelete, onEdit, selected, onToggleSelected, onToggleExpanded, onMove, onDragStart, onDragEnd, onDragOver, onDragEnter, onDrop, dropIndicator }: KanbanCardProps): JSX.Element {
+  // Positions glide on the house tween, during a drag as much as after it. A landed
+  // card is deliberately not given an entrance: the browser showed it under the
+  // cursor, so there is nothing to introduce — materialising it would read as lag.
   const transition = useMotionTransition();
   const canMove = { canMoveUp, canMoveDown, canMoveLeft, canMoveRight };
-  const rail = done ? 'bg-cleared' : overdue ? 'bg-hold' : 'bg-line-strong';
   return <>
-    {dropIndicator && <motion.div initial={{ opacity: 0, scaleY: 0.6 }} animate={{ opacity: 1, scaleY: 1 }} transition={transition} className={dropPlaceholderClass} aria-hidden="true" />}
-    <motion.div layout transition={transition} draggable onDragStart={(event) => onDragStart(event as unknown as DragEvent<HTMLElement>, card.id)} onDragEnd={onDragEnd} onDragOver={(event) => { event.stopPropagation(); onDragOver(event, card.id); }} onDragEnter={(event) => { event.stopPropagation(); onDragEnter(event, card.id); }} onDragLeave={onDragLeave} onDrop={(event) => { event.stopPropagation(); onDrop(event, card.id); }} role="group" aria-label={card.title} className={cn('group relative flex flex-col gap-1.5 border-b border-line px-1 py-2.5 last:border-b-0', selected && 'bg-raised')}>
-      <div className="flex items-stretch gap-2.5">
+    {dropIndicator && <motion.div initial={{ opacity: 0, scaleY: 0.8 }} animate={{ opacity: 1, scaleY: 1 }} transition={transition} className={dropPlaceholderClass} aria-hidden="true" />}
+    <motion.div layout transition={transition} data-card-id={card.id} draggable onDragStart={(event) => onDragStart(event as unknown as DragEvent<HTMLElement>, card.id)} onDragEnd={onDragEnd} onDragOver={(event) => { event.stopPropagation(); onDragOver(event, card.id); }} onDragEnter={(event) => { event.stopPropagation(); onDragEnter(event, card.id); }} onDrop={(event) => { event.stopPropagation(); onDrop(event, card.id); }} role="group" aria-label={card.title} className={cn('group relative flex flex-col rounded-ui border border-line bg-surface p-2.5 shadow-sm', !dragging && 'transition-shadow hover:shadow-md', dragged && 'opacity-40', selected && 'border-accent bg-accent-soft')}>
+      <div className="flex items-start gap-2">
         {/* A 28px button wrapping a visually smaller box, so the hit area meets the
-            strip-control target floor rather than shipping a 14px target. It is not
-            hidden below lg: selection must work on touch, where there is no hover to
-            reveal it. The checked state and the word Selected carry the meaning, so
+            control target floor rather than shipping a 14px target. It is not hidden
+            below lg: selection has to work on touch, where there is no hover to
+            reveal it. The checked box and the word Selected carry the meaning, so
             the accent fill is a convenience rather than the signal. */}
         <button
           type="button"
@@ -71,21 +76,23 @@ export function KanbanCard({ card, done, overdue, expanded, canMoveUp, canMoveDo
         >
           <span
             aria-hidden="true"
-            className={cn('flex h-3.5 w-3.5 items-center justify-center rounded-[2px] border', selected ? 'border-accent bg-accent' : 'border-line-strong')}
+            className={cn('flex h-4 w-4 items-center justify-center rounded-[4px] border', selected ? 'border-accent bg-accent' : 'border-line-strong bg-surface')}
           >
-            {selected && <IconCheck size={11} stroke={2} className="text-accent-fg" />}
+            {selected && <IconCheck size={11} stroke={2.5} className="text-accent-fg" />}
           </span>
         </button>
-        <span aria-hidden="true" className="mt-0.5 hidden w-3 shrink-0 cursor-grab text-faint transition-colors group-hover:text-muted lg:block"><IconGripVertical size={14} stroke={1.5} /></span>
-        <span aria-hidden="true" className={cn('mt-0.5 w-1 shrink-0 rounded-full', rail)} />
+        <span aria-hidden="true" className="mt-0.5 hidden w-3 shrink-0 cursor-grab text-line-strong transition-colors group-hover:text-faint lg:block"><IconGripVertical size={14} stroke={1.5} /></span>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
             <h3 className={cn('min-w-0 flex-1 line-clamp-2 font-body text-sm font-medium leading-5', done ? 'text-muted line-through' : 'text-ink')}>{card.title}</h3>
-            <span aria-hidden="true" className="shrink-0 font-mono text-[11px] tracking-wide text-faint">{tailNumber(card.id)}</span>
+            <span className="flex shrink-0 items-center gap-1.5">
+              {done && <IconCircleCheck size={14} stroke={1.5} aria-hidden="true" className="text-cleared" />}
+              <span aria-hidden="true" className="font-mono text-[11px] tracking-wide text-faint">{tailNumber(card.id)}</span>
+            </span>
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
             <PriorityMeter priority={card.priority} />
-            {selected && <span className="font-mono text-[11px] uppercase tracking-wide text-muted">Selected</span>}
+            {selected && <span className="font-mono text-[11px] uppercase tracking-wide text-accent">Selected</span>}
             {/* The filed date uses the same monospace treatment as the due date, so a
                 card's age reads as part of the system rather than as an addition. It is
                 rendered absolutely, because a relative offset is meaningless as a filing
@@ -104,9 +111,9 @@ export function KanbanCard({ card, done, overdue, expanded, canMoveUp, canMoveDo
           </>}
         </div>
       </div>
-      <div className={cn('flex items-center justify-end gap-0.5', '[@media(hover:hover)]:absolute [@media(hover:hover)]:right-1.5 [@media(hover:hover)]:top-1.5 [@media(hover:hover)]:rounded-strip [@media(hover:hover)]:border [@media(hover:hover)]:border-line [@media(hover:hover)]:bg-raised [@media(hover:hover)]:px-0.5', revealControl)}>
-        {moveControls.map(({ direction, label, Icon, can }) => <Button key={direction} variant="ghost" size="icon" onClick={() => onMove(card.id, direction)} disabled={!canMove[can]} aria-label={`Move ${card.title} ${label}`} title={`Move ${label}`} className="h-7 w-7 text-faint"><Icon size={14} stroke={1.5} /></Button>)}
-        <Button variant="ghost" size="icon" onClick={() => onEdit(card.id)} aria-label={`Edit ${card.title}`} title="Edit card" className="h-7 w-7 text-faint"><IconPencil size={14} stroke={1.5} /></Button>
+      <div className={cn('flex items-center justify-end gap-0.5', !dragging && '[@media(hover:hover)_and_(min-width:768px)]:absolute [@media(hover:hover)_and_(min-width:768px)]:right-1.5 [@media(hover:hover)_and_(min-width:768px)]:top-1.5 [@media(hover:hover)_and_(min-width:768px)]:rounded-ui [@media(hover:hover)_and_(min-width:768px)]:border [@media(hover:hover)_and_(min-width:768px)]:border-line [@media(hover:hover)_and_(min-width:768px)]:bg-surface [@media(hover:hover)_and_(min-width:768px)]:p-0.5 [@media(hover:hover)_and_(min-width:768px)]:shadow-md', dragging ? 'pointer-events-none opacity-0' : revealControl)}>
+        {moveControls.map(({ direction, label, Icon, can }) => <Button key={direction} variant="ghost" size="icon" onClick={() => onMove(card.id, direction)} disabled={!canMove[can]} aria-label={`Move ${card.title} ${label}`} title={`Move ${label}`} className="h-7 w-7 text-muted hover:text-ink"><Icon size={14} stroke={1.5} /></Button>)}
+        <Button variant="ghost" size="icon" onClick={() => onEdit(card.id)} aria-label={`Edit ${card.title}`} title="Edit card" className="h-7 w-7 text-muted hover:text-ink"><IconPencil size={14} stroke={1.5} /></Button>
         <Button variant="destructive" size="icon" onClick={() => onDelete(card.id)} aria-label={`Delete ${card.title}`} title="Delete card" className="h-7 w-7"><IconTrash size={14} stroke={1.5} /></Button>
       </div>
     </motion.div>

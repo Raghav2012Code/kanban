@@ -1,4 +1,4 @@
-import { COLLAPSED_COLUMNS_KEY } from './constants';
+import { COLLAPSED_COLUMNS_KEY, LEGACY_COLLAPSED_COLUMNS_KEY } from './constants';
 
 /**
  * Which columns are collapsed is a presentation preference, so it is stored apart
@@ -11,7 +11,7 @@ import { COLLAPSED_COLUMNS_KEY } from './constants';
 export function loadCollapsedIds(storage: Storage | null = getStorage()): Set<string> {
   if (!storage) return new Set();
   try {
-    const raw = storage.getItem(COLLAPSED_COLUMNS_KEY);
+    const raw = storage.getItem(COLLAPSED_COLUMNS_KEY) ?? storage.getItem(LEGACY_COLLAPSED_COLUMNS_KEY);
     if (!raw) return new Set();
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return new Set();

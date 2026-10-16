@@ -13,7 +13,7 @@ export function serialiseBoard(board: BoardState): string {
   return `${JSON.stringify(board, null, 2)}\n`;
 }
 
-export function downloadBoard(board: BoardState, filename = 'noir-board.json'): void {
+export function downloadBoard(board: BoardState, filename = 'docket-board.json'): void {
   const blob = new Blob([serialiseBoard(board)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');

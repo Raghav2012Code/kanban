@@ -2,50 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Self-hosted variable fonts, served with the app rather than fetched from a
+   font CDN. Two reasons and both are load-bearing: a local-first tool must not
+   depend on someone else's network for its typography, and form controls that
+   first paint in a fallback face are known to keep it when a webfont arrives
+   late — controls rendering in a different font from the rest of the UI was
+   exactly that failure. Each file carries the whole weight axis. */
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/geist.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/geist-mono.woff2") format("woff2");
+}
+
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  --font-display: "Barlow Semi Condensed", ui-sans-serif, system-ui, sans-serif;
-  --font-body: "Archivo", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "B612 Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-display: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --color-bg: #000000;
-  --color-bg: oklch(0 0 0);
-  --color-surface: #131415;
-  --color-surface: oklch(0.19 0.003 250);
-  --color-surface-2: #1e1f21;
-  --color-surface-2: oklch(0.24 0.003 250);
-  --color-fg: #e7e8e9;
-  --color-fg: oklch(0.93 0.002 250);
-  --color-muted: #a9abad;
-  --color-muted: oklch(0.74 0.003 250);
-  --color-faint: #88898b;
-  --color-faint: oklch(0.63 0.003 250);
-  /* Translucent, not opaque: one hairline token must composite correctly over
-     base, surface and surface-2 alike. An opaque grey cannot do that across a
-     ramp. The ladder is split by purpose, because WCAG 1.4.11 asks 3:1 only of
-     boundaries needed to identify a control — not of decorative row rules.
-     Each rung declares its purpose so the token guard can hold it to the floor
-     that purpose implies, and so a new rung cannot be added unmeasured.
-       line        1.54:1 on base  decorative separators and panel frames
-       line-control 3.13:1        input/select/textarea boundaries
-       line-strong 3.95:1         outline buttons and drop affordances */
-  --color-border: rgb(255 255 255 / 0.18); /* purpose: decorative */
-  --color-border-control: rgb(255 255 255 / 0.36); /* purpose: control */
-  --color-border-strong: rgb(255 255 255 / 0.42); /* purpose: emphasis */
-  --color-accent: #efad32;
-  --color-accent: oklch(0.79 0.15 78);
-  --color-accent-fg: #000000;
-  --color-accent-fg: oklch(0 0 0);
-  --color-hold: #ea6a64;
-  --color-hold: oklch(0.68 0.16 25);
-  --color-cleared: #72c298;
-  --color-cleared: oklch(0.75 0.1 160);
-  --color-warn: #efad32;
-  --color-warn: oklch(0.79 0.15 78);
+  --color-bg: #f4f4f6;
+  --color-bg: oklch(0.968 0.002 275);
+  --color-surface: #ffffff;
+  --color-surface: oklch(1 0 0);
+  --color-surface-2: #f9fafc;
+  --color-surface-2: oklch(0.985 0.003 275);
+  --color-fg: #22242a;
+  --color-fg: oklch(0.26 0.012 275);
+  --color-muted: #62646d;
+  --color-muted: oklch(0.505 0.014 275);
+  --color-faint: #6c6e76;
+  --color-faint: oklch(0.54 0.012 275);
+  /* Translucent ink hairlines so one token composites correctly over the canvas,
+     the surface and the raised surface alike. The ladder is split by purpose,
+     because WCAG 1.4.11 asks 3:1 only of boundaries needed to identify a control —
+     not of decorative rules. Each rung declares its purpose so the token guard can
+     hold it to the floor that purpose implies, and so a new rung cannot be added
+     unmeasured.
+       line         1.28:1 on base  decorative separators and tile edges
+       line-control 3.31:1        input/select/textarea boundaries
+       line-strong  5.48:1        outline buttons and dashed affordances */
+  --color-border: rgb(23 24 27 / 0.12); /* purpose: decorative */
+  --color-border-control: rgb(23 24 27 / 0.5); /* purpose: control */
+  --color-border-strong: rgb(23 24 27 / 0.66); /* purpose: emphasis */
+  --color-accent: #4f4cda;
+  --color-accent: oklch(0.51 0.21 277);
+  --color-accent-strong: #4137c5;
+  --color-accent-strong: oklch(0.45 0.21 277);
+  --color-accent-soft: #f2f4ff;
+  --color-accent-soft: oklch(0.968 0.015 277);
+  --color-accent-fg: #ffffff;
+  --color-accent-fg: oklch(1 0 0);
+  --color-hold: #c9302d;
+  --color-hold: oklch(0.55 0.19 27);
+  --color-cleared: #007d50;
+  --color-cleared: oklch(0.52 0.12 160);
+  --color-warn: #915c08;
+  --color-warn: oklch(0.52 0.11 70);
 
-  --duration-fast: 150ms;
-  --duration-normal: 200ms;
+  --duration-fast: 130ms;
+  --duration-normal: 180ms;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
@@ -65,6 +91,7 @@ body {
   font-family: var(--font-body);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
@@ -85,4 +112,61 @@ button {
 
 button:disabled {
   cursor: not-allowed;
+}
+
+/* A popover is positioned from script, so the user-agent's centred placement,
+   its default margin and its inset anchors are all overridden here. */
+[popover] {
+  inset: auto;
+  margin: 0;
+}
+
+/* Floating surfaces settle in rather than teleporting. The popover animates both
+   ways through discrete display/overlay transitions; plain panels and status
+   strips animate on entry, because unmounting removes them before an exit could
+   play. Removals stay instant by design (a filter clears without ceremony). */
+.popover-panel {
+  transform-origin: top right;
+  transition:
+    opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out),
+    display var(--duration-fast) allow-discrete,
+    overlay var(--duration-fast) allow-discrete;
+}
+
+.popover-panel:not(:popover-open) {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+}
+
+@starting-style {
+  .popover-panel:popover-open {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise-in {
+  animation: rise-in var(--duration-normal) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .popover-panel {
+    transition: none;
+  }
+
+  .rise-in {
+    animation: none;
+  }
 }
