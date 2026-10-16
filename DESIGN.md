@@ -116,8 +116,9 @@
 - Duration scale: fast 130ms, normal 180ms.
 - Easing: `--ease-out: cubic-bezier(0.23, 1, 0.32, 1)` for enter; everything uses it.
 - One transition for the whole board: a short tween, never a spring. A panel arrives in under 200ms and stops; nothing bounces, because a precision tool should not wobble.
-- What animates: transform and opacity only. A lane enters on a short `y` settle so a new lane reads as arriving; tiles and drop placeholders settle on the same transition; layout animation is limited to reorder and add/remove.
-- Reduced motion: `useReducedMotion` swaps the tween for a zero-duration transition; `motion-safe:active:` gates press scale.
+- What animates: transform and opacity only. A lane enters on a short `y` settle so a new lane reads as arriving; tiles and drop placeholders settle on the same transition; layout animation is limited to reorder and add/remove. A filed or edited card rises on mount, because a new tile should read as arriving — but removals stay instant, so clearing a filter feels like a cut rather than an exit parade. A deleted lane leaves on a short fade.
+- The Filters popover and the inline confirm panels settle in on the same ease through CSS alone — `@starting-style` plus discrete `display`/`overlay` transitions — and the status strips rise on mount. No JavaScript drives these, so nothing can drop a frame while a drag or a filter change is in flight.
+- Reduced motion: `useReducedMotion` swaps the tween for a zero-duration transition; the CSS settles are disabled under `prefers-reduced-motion`; `motion-safe:active:` gates press scale.
 
 ## Iconography
 
@@ -145,7 +146,7 @@
 - Keyboard: fully operable. Cards carry explicit up/down/left/right move buttons (not only drag); rename is Enter/Escape; forms submit on Enter; the Filters popover closes on Escape; undo/redo are focusable controls.
 - Targets: 28px minimum for tile controls, 32-36px for bar and primary controls (meets WCAG 2.2 24px minimum; desktop-first tool, touch controls are 28px).
 - Color independence: priority is bars + text label; overdue is alert icon + "LATE" text; done is a strikethrough + a check glyph + position; saturation is the word "Over". Passes in grayscale.
-- Reduced motion: honored. Notes: `aria-live` on notices; icon-only buttons named.
+- Reduced motion: honored. Notes: `aria-live` on notices; icon-only buttons named; closing the Filters popover returns focus to its trigger when focus was inside the panel.
 
 ## Tokens (source of truth)
 
@@ -210,4 +211,5 @@
 
 ## Changelog
 
+- 2026-10-16: smoothing pass for shipping. Cards rise on mount (the AnimatePresence `initial={false}` keeps the first load calm — only lanes settle); a deleted lane leaves on a short fade; the Filters popover and inline confirm panels settle in through CSS `@starting-style` and discrete `display`/`overlay` transitions with zero JavaScript; the selection bar and the two notice strips rise on mount. Removals stay instant by decision, so clearing a filter or collapsing a lane is a cut, not a ceremony. Closing the popover returns focus to its trigger. Nothing in the behaviour contract moved: the same 234 tests pass untouched.
 - 2026-10-16: full rework, **Noir Board -> Docket**, dark instrument -> light precision. The board was renamed and every visual layer rebuilt: a cool near-white canvas with white tiles in open lanes replaces ruled strips in filled bays; a single slim top bar (brand, search, Filters popover, actions, totals) replaces the header control cluster and the fixed analytics footer; the type pairing is now one voice (Geist + Geist Mono) instead of a signage trio; the palette is a new cool-neutral ramp with one indigo accent, every figure re-measured and republished, and the token guard recomputes the new table rather than trusting it. Storage keys moved to the new name with a one-time read of the legacy keys, so an existing board and its collapse preferences load unchanged and are thereafter written under the new name. Defects fixed on the way: the warning banner's border and tint were opacity modifiers on token colours, which this adapter emits as nothing — it rendered bare and is now solid-token; the favicon carried literal hexes from a palette no browser showed and is redrawn from the tokens; the drop placeholders now match tile height instead of the retired strip height. Behaviour contracts were preserved whole: Done identity on the stable column id, positional drops disabled under any active view, sorts never written back, bulk moves as sequences of single moves, one announcement channel, bounded linear undo.

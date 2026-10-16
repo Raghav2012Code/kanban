@@ -7,5 +7,7 @@ dist/
 .DS_Store
 .commandcode/
 .openchamber/
+dev*.log
+screenshot.png
 
 .vitest/

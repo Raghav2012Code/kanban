@@ -65,7 +65,7 @@ export function BoardTransfer({ board, onReplace, onResult }: BoardTransferProps
         }}
       />
       {pending ? (
-        <div role="status" className="absolute right-0 top-full z-30 mt-2 w-60 rounded-ui border border-line bg-surface p-3 shadow-lg">
+        <div role="status" className="rise-in absolute right-0 top-full z-30 mt-2 w-60 rounded-ui border border-line bg-surface p-3 shadow-lg">
           <p className="text-[13px] leading-5 text-ink">Replace this board?</p>
           <div className="mt-2.5 flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={() => setPending(null)}>Cancel</Button>

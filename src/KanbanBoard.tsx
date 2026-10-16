@@ -338,7 +338,7 @@ export default function KanbanBoard(): JSX.Element {
   // column, so the destination a person actually wants must not be the one control
   // they cannot press.
   const selectionBar = selectedIds.size > 0 ? (
-    <div className="border-b border-line bg-surface">
+    <div className="rise-in border-b border-line bg-surface">
       <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-2 px-4 py-2 sm:px-6 lg:px-10">
         <span className="font-mono text-[11px] uppercase tracking-wide text-muted">{selectedIds.size} selected</span>
         <span className="flex flex-wrap items-center gap-1.5">
@@ -390,7 +390,7 @@ export default function KanbanBoard(): JSX.Element {
     {selectionBar}
     <main className="mx-auto min-w-0 max-w-[1600px] px-4 py-5 sm:px-6 lg:px-10">
       <StorageNotice warning={storageWarning} onDismiss={dismissStorageWarning} />
-      {columnNotice && <div role="status" aria-live="polite" className="mb-4 flex items-center justify-between gap-3 rounded-ui border border-line bg-surface px-3 py-2 text-xs text-muted shadow-sm"><span className="min-w-0 flex-1 leading-5">{columnNotice}</span><Button variant="ghost" size="icon" onClick={() => setColumnNotice(null)} aria-label="Dismiss column notice" className="h-6 w-6"><IconX size={13} stroke={1.5} /></Button></div>}
+      {columnNotice && <div role="status" aria-live="polite" className="rise-in mb-4 flex items-center justify-between gap-3 rounded-ui border border-line bg-surface px-3 py-2 text-xs text-muted shadow-sm"><span className="min-w-0 flex-1 leading-5">{columnNotice}</span><Button variant="ghost" size="icon" onClick={() => setColumnNotice(null)} aria-label="Dismiss column notice" className="h-6 w-6"><IconX size={13} stroke={1.5} /></Button></div>}
       <motion.div layout transition={transition} className="min-w-0 overflow-x-auto" onDragLeave={handleDragLeave}>
         <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:gap-4">
           <AnimatePresence initial={false}>

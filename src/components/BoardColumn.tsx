@@ -96,7 +96,7 @@ export function BoardColumn({ column, cards, activeForm, renaming, renameValue, 
   const countTitle = hasLimit
     ? `${cards.length} of ${total} cards${overLimit ? ', over the Work In Progress limit' : ''}`
     : `${cards.length} of ${total} cards`;
-  return <motion.section layout variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }} initial="hidden" animate="visible" transition={settle} className={panel} onDragOver={(event) => onDragOver(event)} onDragEnter={(event) => onDragEnter(event)} onDragLeave={onDragLeave} onDrop={(event) => onDrop(event)} aria-label={`${column.title} column`}>
+  return <motion.section layout variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 }, exit: { opacity: 0, scale: 0.98 } }} initial="hidden" animate="visible" exit="exit" transition={settle} className={panel} onDragOver={(event) => onDragOver(event)} onDragEnter={(event) => onDragEnter(event)} onDragLeave={onDragLeave} onDrop={(event) => onDrop(event)} aria-label={`${column.title} column`}>
     <div className="flex items-center gap-1">
       {renaming
         ? <Input ref={renameRef} value={renameValue} onChange={(event) => onRenameChange(event.target.value)} onBlur={onSaveRename} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key === 'Enter') onSaveRename(); if (event.key === 'Escape') onCancelRename(); }} aria-label="Rename column" className="h-7 min-w-0 flex-1 px-2 py-0.5 text-sm" />

@@ -62,7 +62,13 @@ export function FilterPopover({ priority, onPriorityChange, dueWithinDays, onDue
   useEffect(() => {
     const panel = panelRef.current;
     if (!panel || !popoverSupported) return;
-    const onToggle = (event: Event) => setOpen((event as Event & { newState?: string }).newState === 'open');
+    const onToggle = (event: Event) => {
+      const nowOpen = (event as Event & { newState?: string }).newState === 'open';
+      setOpen(nowOpen);
+      // A popover takes focus into itself; on close, hand it back to the trigger
+      // so a keyboard path never drops to the document body.
+      if (!nowOpen && panel.contains(document.activeElement)) buttonRef.current?.focus();
+    };
     panel.addEventListener('toggle', onToggle);
     return () => panel.removeEventListener('toggle', onToggle);
   }, []);
@@ -114,7 +120,7 @@ export function FilterPopover({ priority, onPriorityChange, dueWithinDays, onDue
         hidden={popoverSupported ? undefined : !open}
         onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => { if (!popoverSupported && event.key === 'Escape') close(); }}
         aria-label="Filters"
-        className={cn('z-30 w-72 rounded-ui border border-line bg-surface p-3 shadow-lg', !popoverSupported && 'absolute right-0 top-full mt-2')}
+        className={cn('popover-panel z-30 w-72 rounded-ui border border-line bg-surface p-3 shadow-lg', !popoverSupported && 'absolute right-0 top-full mt-2')}
       >
         <div className="flex flex-col gap-3">
           <div className="space-y-1">
