@@ -10,7 +10,7 @@
   - precise -> hairline tile edges, strict column lanes, tabular figures, one 8px radius
   - quiet -> a cool near-white canvas, near-zero chroma in the neutrals, one indigo accent, shadows only on surfaces that float
   - professional -> compact density, monospace for every figure, one slim top bar owning all chrome
-  - legible -> 11px floor, 14px UI, 16px inputs, hierarchy from weight and tone rather than colour
+  - legible -> 11px floor, 14px UI, controls at the same 14px, hierarchy from weight and tone rather than colour
   - purposeful -> motion only for state and drag; no hover lift, no decoration
 - Aesthetic essence (3 words): precision, clarity, control.
 - Single-minded proposition: the board reads like a well-run desk for your own work — every card filed, numbered, and answerable — not a dark instrument panel and not a generic task app. One person, one device, no account: nothing is sent anywhere and no action is attributed to anyone, because there is nobody else.
@@ -28,8 +28,8 @@
 
 ## Typography
 
-- Display and body: **Geist** | source: Google Fonts | license: OFL
-- Mono: **Geist Mono** (figures, dates, counts, references, labels) | source: Google Fonts | license: OFL
+- Display and body: **Geist** | source: self-hosted, variable woff2 (`public/fonts`) | license: OFL
+- Mono: **Geist Mono** (figures, dates, counts, references, labels) | source: self-hosted, variable woff2 (`public/fonts`) | license: OFL
 - The pairing works because one neutral grotesque does the whole voice: Geist holds a 15px wordmark, 14px card titles and 11px meta without turning cold or decorative, and Geist Mono carries every figure at a legibility floor that survives dense columns. The previous three-face pairing (a semi-condensed signage display plus a body grotesque plus an aviation mono) belonged to the retired instrument identity; a commercial surface wants one voice, not a poster and a caption.
 - Only the weights actually used are requested: Geist 400/500/600 and Geist Mono 400/500 — five files, none unused.
 - Scale: ratio 1.2 minor third (dense tool), base 16px:
@@ -39,7 +39,7 @@
   | body | 14px | 1.4 (20px) | card titles, buttons, notices |
   | small | 12px | 1.4 | panel labels, "File card", empty states |
   | micro | 11px | 1.4 | all mono labels, counts, dates, references |
-  | input | 16px | 1.4 | form controls (prevents iOS zoom) |
+  | input | 14px (16px on touch) | 1.4 | form controls; the 16px floor applies only under `pointer: coarse`, where the platform zooms anything smaller |
 - Weights: 400 / 500 / 600. Tracking: wordmark tight (-0.01em), mono labels wide (0.07-0.18em). Figures are tabular wherever numbers can move.
 
 ## Color
@@ -98,7 +98,7 @@
 - **The limit readout is a fraction, and saturation is a word.** A column with a limit shows `visible/limit`; without one it shows the bare count. Over-limit is stated as the word "Over" in a bordered badge beside the count, never by colour alone, so it survives greyscale and colour blindness. The limit is set from a small gauge control in the header that swaps to a numeric field on Enter/Escape, mirroring the rename flow; emptying the field clears the limit. A refused move is explained in the board notice.
 - **The filters live behind one trigger.** Search stays visible in the bar; priority, due window, filed window, sort, column title and the overdue toggle live in the **Filters popover** — a native popover, so the top layer and Escape/outside-click dismissal come from the platform, with the position set from script rather than CSS anchor positioning. The trigger reports how many dimensions are active as a count badge and in its accessible name (`Filters, 2 active`), and carries one "Reset filters" action, so a filter can never be silently forgotten. The overdue toggle's state is in `aria-pressed` and in the accessible name, never in styling alone.
 - States: every button has hover, active (motion-safe scale 0.98), focus (accent box-shadow ring, 2px offset) and disabled (opacity 40).
-- Inputs: visible mono uppercase labels, 16px text, 36px height, control-grade borders, accent focus border and 1px ring, no placeholder-as-label.
+- Inputs: visible mono uppercase labels, 14px text (16px on touch), 36px height, control-grade borders, accent focus border and 1px ring, no placeholder-as-label.
 - Tables: n/a.
 - Overlays: no modals. The only floating surfaces are the Filters popover, the strip controls cluster (a lightweight absolute cluster on pointer devices) and the import confirmation panel; none needs a focus trap.
 - Empty / loading / error: a lane with no tiles teaches the first action ("No cards in this column. File the first card."); a filtered lane with no matches says so distinctly; storage failures and corrupt data surface a dismissible inline notice and never dead-end.
@@ -211,6 +211,7 @@
 
 ## Changelog
 
+- 2026-10-16: typography, made deterministic and at the right optical size. The fonts are self-hosted now (`public/fonts`, two variable woff2 files, preloaded in `index.html`), because a local-first tool should not depend on a font CDN for its own voice — and because form controls that first paint in a fallback face are known to keep it when a webfont arrives late, which is how a panel of selects ends up in a different font from the rest of the UI. Preloading removes even the one-frame swap. Alongside that, the controls come down to the UI's own optical size: 14px like every button and card title, with the 16px floor kept under `pointer: coarse` so the platform still cannot zoom a focused field on touch. The popover's selects, the search field and every form control now read as part of one system rather than a larger, lighter face pasted in.
 - 2026-10-16: drag feel, corrected. The earlier drag fix stopped the re-render churn but over-corrected: positions snapped instantly during a drag, which read as a stutter of hard jumps. Now every slot change glides on the house tween, during the drag as much as after it — made affordable by the churn fix, not by the snap. Three further corrections ride with it: the placeholder's side of a tile is sticky inside a 6px band around the midpoint, so a hand jittering there cannot flip the slot and its animation back and forth; hovering a lane's own space — a gap between tiles, the header, above the first tile or below the last — anchors to the nearest tile instead of yanking the placeholder to the top and shifting every tile for an 8px gap; and a drop lands exactly where the placeholder showed, because the last resolved slot is the source of truth. The placeholder no longer unmounts and remounts while the pointer moves inside a lane, because a `dragleave` with a null `relatedTarget` (which is what Chrome reports) is now told from a genuine exit by coordinates. Cards no longer rise on mount: a landed card appears where its ghost was. Measured on the production bundle at 4x CPU throttle: 240 dragover events in 2.5s, 10ms median frame, zero long tasks; the worst-case alternating flip runs 2.7s at a 20ms p95. All 234 tests pass.
 - 2026-10-16: smoothing pass for shipping. Lanes settle on entry; a deleted lane leaves on a short fade; the Filters popover and inline confirm panels settle in through CSS `@starting-style` and discrete `display`/`overlay` transitions with zero JavaScript; the selection bar and the two notice strips rise on mount. Removals stay instant by decision, so clearing a filter or collapsing a lane is a cut, not a ceremony. Closing the popover returns focus to its trigger.
 - 2026-10-16: full rework, **Noir Board -> Docket**, dark instrument -> light precision. The board was renamed and every visual layer rebuilt: a cool near-white canvas with white tiles in open lanes replaces ruled strips in filled bays; a single slim top bar (brand, search, Filters popover, actions, totals) replaces the header control cluster and the fixed analytics footer; the type pairing is now one voice (Geist + Geist Mono) instead of a signage trio; the palette is a new cool-neutral ramp with one indigo accent, every figure re-measured and republished, and the token guard recomputes the new table rather than trusting it. Storage keys moved to the new name with a one-time read of the legacy keys, so an existing board and its collapse preferences load unchanged and are thereafter written under the new name. Defects fixed on the way: the warning banner's border and tint were opacity modifiers on token colours, which this adapter emits as nothing — it rendered bare and is now solid-token; the favicon carried literal hexes from a palette no browser showed and is redrawn from the tokens; the drop placeholders now match tile height instead of the retired strip height. Behaviour contracts were preserved whole: Done identity on the stable column id, positional drops disabled under any active view, sorts never written back, bulk moves as sequences of single moves, one announcement channel, bounded linear undo.

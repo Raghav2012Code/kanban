@@ -2,6 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Self-hosted variable fonts, served with the app rather than fetched from a
+   font CDN. Two reasons and both are load-bearing: a local-first tool must not
+   depend on someone else's network for its typography, and form controls that
+   first paint in a fallback face are known to keep it when a webfont arrives
+   late — controls rendering in a different font from the rest of the UI was
+   exactly that failure. Each file carries the whole weight axis. */
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/geist.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/geist-mono.woff2") format("woff2");
+}
+
 :root {
   color-scheme: light;
 
