@@ -63,7 +63,7 @@
   - hold (overdue/destructive): oklch(0.55 0.19 27) | #c9302d
   - cleared (done): oklch(0.52 0.12 160) | #007d50
   - warn: oklch(0.52 0.11 70) | #915c08
-  - priority meter uses ink (filled) and border-strong (empty); priority is never carried by hue.
+  - priority meter fills in ink and leaves its unfilled slots on the decorative border rung — the same weight as a tile's edge, because they are the metre's structure, not its content; the count is never carried by hue.
 - **Borders are translucent ink, not opaque grey.** One hairline token has to sit on the canvas, the tile and the raised surface and stay correct on all three; an opaque grey tuned for white vanishes on the canvas. Consequence: opacity modifiers are invalid on these tokens and must not be reintroduced.
 - **A refused opacity modifier is a bug, and it was one.** In this Tailwind 3 adapter, `border-warn/40` or `bg-warn/10` emit **nothing at all** — the class silently disappears from the stylesheet. The retired warning banner carried both and rendered borderless and untinted for its whole life; the rework replaced it with solid tokens (`border-warn` on a `surface` fill). Never write an opacity modifier against a token colour; if a softer tone is needed, declare a soft token.
 - **The ladder is split by purpose, not by taste.** WCAG 1.4.11 asks 3:1 of boundaries needed to *identify a control*; it does not ask it of decorative rules. So three tokens, each measured on all three grounds:
@@ -76,7 +76,7 @@
 ## Spacing, radius, shadow
 
 - Spacing base: 4px, scale 1/1.5/2/2.5/3/4/5/6 (Tailwind). Tight inside a tile (p-2.5, gap-2), generous between sections (py-5, px-10 at lg), rules and py-5 between board sections.
-- Radius: one 8px token (`rounded-ui`) on tiles, fields, buttons and floating panels. Full pill reserved for counters, the saturation badge and meter bars. Nothing else.
+- Radius: one 8px token (`rounded-ui`) on tiles, fields, buttons and floating panels, with a small 1.5px soft on the priority meter's bars. Full pill reserved for counters and the saturation badge. Nothing else.
 - Shadow approach: **borders define, shadows float.** A tile carries one hairline border and one `shadow-sm`, deepening to `shadow-md` on hover; a floating panel (popover, import confirmation) carries `shadow-lg`. Flat rows and dividers take no shadow. Never a border plus `shadow-lg`, never elevation shadows on static chrome.
 
 ## Layout and composition
@@ -130,7 +130,7 @@
 - Mode: none. This is a data tool; the only graphic device is the brand mark, reused as the priority meter's form.
 - Brand mark: three ascending bars on a common baseline, in a 32-unit box. Bars are 6.5 units wide with 3.5-unit gaps, spanning 83% of the box width, with a 2-unit corner radius. The ramp runs faint **4.62**, muted **5.36**, accent **5.66** against base, so the accent sits only on the leading bar, the ascending heights carry the progression, and every bar clears 3:1 — the ramp is a *tonal* decision rather than a contrast one: three steps of a single hue would read as a scale rather than a mark.
 - The mark is drawn from the token variables rather than literal hex, so it themes with the board. The favicon is the same geometry with the tokens flattened, on a white tile with a hairline ring so it reads on both light and dark browser chrome; the apple touch icon is full-bleed with no corner radius, because iOS applies its own mask.
-- The priority meter keeps `ink` and `border-strong` only. It shares the mark's *form*, never its colour, because priority must never be carried by hue.
+- The priority meter keeps `ink` for what is filled and the decorative border rung for what is not. It shares the mark's *form*, never its colour, because priority must never be carried by hue.
 
 ## Light mode
 
