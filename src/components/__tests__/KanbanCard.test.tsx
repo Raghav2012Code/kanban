@@ -27,7 +27,6 @@ function renderCard(overrides: Partial<ComponentProps<typeof KanbanCard>> = {}) 
     onDragEnd: vi.fn(),
     onDragOver: vi.fn(),
     onDragEnter: vi.fn(),
-    onDragLeave: vi.fn(),
     onDrop: vi.fn(),
     dropIndicator: false,
     ...overrides,

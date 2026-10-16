@@ -3,7 +3,6 @@ import { IconAlertTriangle, IconArrowDown, IconArrowLeft, IconArrowRight, IconAr
 import type { DragEvent } from 'react';
 import { useMotionTransition } from '@/hooks/useMotionTransition';
 import { formatDueDate, formatFiledDate } from '@/lib/dates';
-import { reducedMotionTransition } from '@/lib/motion';
 import { tailNumber } from '@/lib/ids';
 import { cn } from '@/lib/utils';
 import type { CardItem } from '@/types/kanban';
@@ -36,7 +35,6 @@ interface KanbanCardProps {
   onDragEnd: () => void;
   onDragOver: (event: DragEvent<HTMLElement>, id: string) => void;
   onDragEnter: (event: DragEvent<HTMLElement>, id: string) => void;
-  onDragLeave: (event: DragEvent<HTMLElement>) => void;
   onDrop: (event: DragEvent<HTMLElement>, id: string) => void;
   dropIndicator: boolean;
 }
@@ -53,16 +51,15 @@ const moveControls: { direction: MoveDirection; label: string; Icon: typeof Icon
   { direction: 'right', label: 'to the next column', Icon: IconArrowRight, can: 'canMoveRight' },
 ];
 
-export function KanbanCard({ card, done, overdue, expanded, dragging = false, dragged = false, canMoveUp, canMoveDown, canMoveLeft, canMoveRight, onDelete, onEdit, selected, onToggleSelected, onToggleExpanded, onMove, onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop, dropIndicator }: KanbanCardProps): JSX.Element {
+export function KanbanCard({ card, done, overdue, expanded, dragging = false, dragged = false, canMoveUp, canMoveDown, canMoveLeft, canMoveRight, onDelete, onEdit, selected, onToggleSelected, onToggleExpanded, onMove, onDragStart, onDragEnd, onDragOver, onDragEnter, onDrop, dropIndicator }: KanbanCardProps): JSX.Element {
+  // Positions glide on the house tween, during a drag as much as after it. A landed
+  // card is deliberately not given an entrance: the browser showed it under the
+  // cursor, so there is nothing to introduce — materialising it would read as lag.
   const transition = useMotionTransition();
-  // Under the drag, positions snap instead of animating; the board settles once
-  // when the card lands. Retargeting a tween on every slot change is what made
-  // the board wobble under the cursor.
-  const settle = dragging ? reducedMotionTransition : transition;
   const canMove = { canMoveUp, canMoveDown, canMoveLeft, canMoveRight };
   return <>
-    {dropIndicator && <motion.div initial={{ opacity: 0, scaleY: 0.8 }} animate={{ opacity: 1, scaleY: 1 }} transition={settle} className={dropPlaceholderClass} aria-hidden="true" />}
-    <motion.div layout transition={settle} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} draggable onDragStart={(event) => onDragStart(event as unknown as DragEvent<HTMLElement>, card.id)} onDragEnd={onDragEnd} onDragOver={(event) => { event.stopPropagation(); onDragOver(event, card.id); }} onDragEnter={(event) => { event.stopPropagation(); onDragEnter(event, card.id); }} onDragLeave={onDragLeave} onDrop={(event) => { event.stopPropagation(); onDrop(event, card.id); }} role="group" aria-label={card.title} className={cn('group relative flex flex-col rounded-ui border border-line bg-surface p-2.5 shadow-sm', !dragging && 'transition-shadow hover:shadow-md', dragged && 'opacity-40', selected && 'border-accent bg-accent-soft')}>
+    {dropIndicator && <motion.div initial={{ opacity: 0, scaleY: 0.8 }} animate={{ opacity: 1, scaleY: 1 }} transition={transition} className={dropPlaceholderClass} aria-hidden="true" />}
+    <motion.div layout transition={transition} data-card-id={card.id} draggable onDragStart={(event) => onDragStart(event as unknown as DragEvent<HTMLElement>, card.id)} onDragEnd={onDragEnd} onDragOver={(event) => { event.stopPropagation(); onDragOver(event, card.id); }} onDragEnter={(event) => { event.stopPropagation(); onDragEnter(event, card.id); }} onDrop={(event) => { event.stopPropagation(); onDrop(event, card.id); }} role="group" aria-label={card.title} className={cn('group relative flex flex-col rounded-ui border border-line bg-surface p-2.5 shadow-sm', !dragging && 'transition-shadow hover:shadow-md', dragged && 'opacity-40', selected && 'border-accent bg-accent-soft')}>
       <div className="flex items-start gap-2">
         {/* A 28px button wrapping a visually smaller box, so the hit area meets the
             control target floor rather than shipping a 14px target. It is not hidden

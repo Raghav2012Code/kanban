@@ -25,6 +25,9 @@ import type { BoardState, CardDraft, CardItem, ColumnItem, DropTarget, PriorityF
 /** At most one card form is open at a time: a column's file-card form, or one card's edit form. */
 type CardFormTarget = { kind: 'file'; columnId: string } | { kind: 'edit'; cardId: string };
 
+/** Half of the sticky band, in pixels, around a tile's midpoint while aiming a drop. */
+const INSERT_BAND = 6;
+
 export default function KanbanBoard(): JSX.Element {
   const { board, mutate: updateBoard, undo, redo, canUndo, canRedo, replaceBoard, storageWarning, dismissStorageWarning } = useKanbanBoard();
   const [search, setSearch] = useState('');
@@ -275,15 +278,27 @@ export default function KanbanBoard(): JSX.Element {
   const clearDrag = () => { setDraggedCardId(null); updateDropTarget(null); };
   /**
    * Drop targets only change when the resolved slot actually changes. A dragover
-   * that stays within the same slot must not re-render the board — and with a
-   * fresh object per event it did, dozens of times a second, re-measuring every
-   * animated element under the cursor. That re-render churn is what made a
-   * reorder drag stutter.
+   * that stays within the same slot must not re-render the board — with a fresh
+   * object per event it did, dozens of times a second, which is what made a
+   * reorder drag stutter. What changes is then animated, not snapped: one clean
+   * transition per real slot change.
    */
   const updateDropTarget = (next: DropTarget | null) => setDropTarget((current) => {
     if (current === next) return current;
     if (current && next && current.columnId === next.columnId && current.cardId === next.cardId && Boolean(current.insertAfter) === Boolean(next.insertAfter)) return current;
     return next;
+  });
+  /**
+   * The placeholder's side of a tile is sticky inside a small band around the
+   * midpoint, so a hand jittering there cannot flip the slot — and its animation —
+   * back and forth. Only a deliberate crossing moves the placeholder.
+   */
+  const aimAt = (columnId: string, cardId: string, clientY: number, rect: { top: number; height: number }) => setDropTarget((current) => {
+    const sticky = current && current.columnId === columnId && current.cardId === cardId ? Boolean(current.insertAfter) : undefined;
+    const band = sticky === undefined ? 0 : sticky ? INSERT_BAND : -INSERT_BAND;
+    const insertAfter = resolveInsertAfter(clientY + band, rect.top, rect.height);
+    if (current && current.columnId === columnId && current.cardId === cardId && Boolean(current.insertAfter) === insertAfter) return current;
+    return { columnId, cardId, insertAfter };
   });
   const handleDragStart = (event: DragEvent<HTMLElement>, cardId: string) => {
     event.dataTransfer.effectAllowed = 'move';
@@ -295,11 +310,19 @@ export default function KanbanBoard(): JSX.Element {
     event.dataTransfer.dropEffect = 'move';
     if (!positionalEnabled || !cardId) { updateDropTarget({ columnId }); return; }
     const rect = event.currentTarget.getBoundingClientRect();
-    updateDropTarget({ columnId, cardId, insertAfter: resolveInsertAfter(event.clientY, rect.top, rect.height) });
+    aimAt(columnId, cardId, event.clientY, rect);
   };
   const handleDragLeave = (event: DragEvent<HTMLElement>) => {
+    // Chrome reports no relatedTarget for drag events, so a leave cannot be told
+    // from an interior crossing by target alone. Interior crossings must not clear
+    // the target: clearing and re-aiming on every tile-to-gap step unmounts and
+    // remounts the placeholder, which reads as a stutter under the cursor. The
+    // target only clears when the pointer is genuinely outside the lane.
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom) return;
     const related = event.relatedTarget;
-    if (!(related instanceof Node) || !event.currentTarget.contains(related)) updateDropTarget(null);
+    if (related instanceof Node && event.currentTarget.contains(related)) return;
+    updateDropTarget(null);
   };
   // A dropped card is announced exactly like an arrow-key move, because a drag is a
   // move and a person who cannot see the drop happening needs the same confirmation.
@@ -309,11 +332,15 @@ export default function KanbanBoard(): JSX.Element {
     if (id && board.cards[id]) {
       if (refuseDropOntoCollapsed(columnId)) { clearDrag(); return; }
       if (refuseIfAtLimit(id, board.columns.find((column) => column.id === columnId))) { clearDrag(); return; }
-      const anchorId = positionalEnabled ? cardId : undefined;
+      // The card lands exactly where the placeholder showed: the slot resolved by
+      // the last dragover is the source of truth, and the raw event is only the
+      // fallback for a drop that arrives with no preceding dragover.
+      const anchored = positionalEnabled && dropTarget && dropTarget.columnId === columnId && dropTarget.cardId && board.cards[dropTarget.cardId] ? dropTarget : null;
+      const anchorId = anchored ? anchored.cardId : positionalEnabled ? cardId : undefined;
       let insertAfter = false;
       if (anchorId) {
         const rect = event.currentTarget.getBoundingClientRect();
-        insertAfter = resolveInsertAfter(event.clientY, rect.top, rect.height);
+        insertAfter = anchored ? Boolean(anchored.insertAfter) : resolveInsertAfter(event.clientY, rect.top, rect.height);
       }
       const moved = moveCard(board, id, columnId, anchorId, insertAfter);
       const landed = moved.columns.find((column) => column.cardIds.includes(id));
@@ -323,7 +350,24 @@ export default function KanbanBoard(): JSX.Element {
     }
     clearDrag();
   };
-  const handleColumnDragOver = (event: DragEvent<HTMLElement>, columnId: string) => handleDragOver(event, columnId);
+  // Hovering the lane's own space — a gap between tiles, the header, above the
+  // first tile or below the last — anchors to the nearest tile instead of yanking
+  // the placeholder to the top of the lane and shifting every tile for an 8px gap.
+  const handleColumnDragOver = (event: DragEvent<HTMLElement>, columnId: string) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    const tiles = positionalEnabled
+      ? Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[data-card-id]')).filter((tile) => Boolean(tile.dataset.cardId))
+      : [];
+    if (tiles.length === 0) { updateDropTarget({ columnId }); return; }
+    let anchor = tiles[0];
+    let anchorRect = anchor.getBoundingClientRect();
+    for (const tile of tiles) {
+      const rect = tile.getBoundingClientRect();
+      if (event.clientY >= rect.top + rect.height / 2) { anchor = tile; anchorRect = rect; }
+    }
+    aimAt(columnId, anchor.dataset.cardId as string, event.clientY, anchorRect);
+  };
   // Renaming closes a file-card form, as it always has, but never an open edit
   // form: an edit is work in progress and renaming a column must not discard it.
   const beginRename = (column: ColumnItem) => {

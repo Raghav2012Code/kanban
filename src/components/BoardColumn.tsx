@@ -6,7 +6,6 @@ import { useMotionTransition } from '@/hooks/useMotionTransition';
 import { isCardOverdue } from '@/lib/dates';
 import { isColumnOverLimit } from '@/lib/board';
 import { isDoneColumn } from '@/lib/done';
-import { reducedMotionTransition } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { cardToDraft } from '@/lib/validation';
 import type { CardDraft, CardItem, ColumnItem, DropTarget } from '@/types/kanban';
@@ -73,12 +72,10 @@ interface BoardColumnProps {
 export function BoardColumn({ column, cards, activeForm, renaming, renameValue, draggedCardId, dropTarget, positionalEnabled, canMoveLeft, canMoveRight, onStartCardForm, onSaveCard, onCancelCardForm, onBeginRename, onRenameChange, onSaveRename, onCancelRename, onDeleteColumn, onDeleteCard, onEditCard, editingCardId, onSaveCardDraft, onCancelEditCard, onMoveColumn, selectedIds, onToggleSelected, collapsed, onToggleCollapsed, settingLimit, limitValue, onStartLimit, onLimitChange, onSaveLimit, onCancelLimit, onMove, expandedIds, onToggleExpanded, onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop }: BoardColumnProps): JSX.Element {
   const renameRef = useRef<HTMLInputElement>(null);
   const limitRef = useRef<HTMLInputElement>(null);
+  // Positions glide on the house tween, during a drag as much as after it: the
+  // slot only changes on a deliberate crossing (the aim carries a dead band), so
+  // each change is one clean transition instead of a snapped jump.
   const transition = useMotionTransition();
-  // While a card is being dragged, the board must not animate under the cursor:
-  // every slot change would otherwise retarget a 180ms layout animation and the
-  // lane would visibly wobble. Positions snap instantly during the drag and the
-  // one settle animation plays when the card lands.
-  const settle = draggedCardId ? reducedMotionTransition : transition;
   useEffect(() => { if (renaming) { renameRef.current?.focus(); renameRef.current?.select(); } }, [renaming]);
   useEffect(() => { if (settingLimit) { limitRef.current?.focus(); limitRef.current?.select(); } }, [settingLimit]);
   const isDone = isDoneColumn(column);
@@ -96,7 +93,7 @@ export function BoardColumn({ column, cards, activeForm, renaming, renameValue, 
   const countTitle = hasLimit
     ? `${cards.length} of ${total} cards${overLimit ? ', over the Work In Progress limit' : ''}`
     : `${cards.length} of ${total} cards`;
-  return <motion.section layout variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 }, exit: { opacity: 0, scale: 0.98 } }} initial="hidden" animate="visible" exit="exit" transition={settle} className={panel} onDragOver={(event) => onDragOver(event)} onDragEnter={(event) => onDragEnter(event)} onDragLeave={onDragLeave} onDrop={(event) => onDrop(event)} aria-label={`${column.title} column`}>
+  return <motion.section layout variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 }, exit: { opacity: 0, scale: 0.98 } }} initial="hidden" animate="visible" exit="exit" transition={transition} className={panel} onDragOver={(event) => onDragOver(event)} onDragEnter={(event) => onDragEnter(event)} onDragLeave={onDragLeave} onDrop={(event) => onDrop(event)} aria-label={`${column.title} column`}>
     <div className="flex items-center gap-1">
       {renaming
         ? <Input ref={renameRef} value={renameValue} onChange={(event) => onRenameChange(event.target.value)} onBlur={onSaveRename} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key === 'Enter') onSaveRename(); if (event.key === 'Escape') onCancelRename(); }} aria-label="Rename column" className="h-7 min-w-0 flex-1 px-2 py-0.5 text-sm" />
@@ -110,7 +107,7 @@ export function BoardColumn({ column, cards, activeForm, renaming, renameValue, 
       <Button variant="ghost" size="icon" onClick={() => onMoveColumn('right')} disabled={!canMoveRight} aria-label={`Move ${column.title} column right`} title="Move column right" className="h-7 w-7 text-faint hover:text-ink"><IconArrowRight size={14} stroke={1.5} /></Button>
       <Button variant="destructive" size="icon" onClick={onDeleteColumn} aria-label={`Delete ${column.title} column`} title={total > 0 ? 'Only empty columns can be deleted' : 'Delete column'} className="h-7 w-7"><IconTrash size={14} stroke={1.5} /></Button>
     </div>
-    <div id={bodyId} hidden={collapsed} className="flex flex-col gap-2" onDragLeave={onDragLeave}><AnimatePresence initial={false}>{showColumnDropIndicator && <motion.div key="column-drop" initial={{ opacity: 0, scaleY: 0.8 }} animate={{ opacity: 1, scaleY: 1 }} exit={{ opacity: 0, scaleY: 0.8 }} transition={settle} className={dropPlaceholderClass} aria-hidden="true" />}{cards.map((card) => {
+    <div id={bodyId} hidden={collapsed} className="flex flex-col gap-2"><AnimatePresence initial={false}>{showColumnDropIndicator && <motion.div key="column-drop" initial={{ opacity: 0, scaleY: 0.8 }} animate={{ opacity: 1, scaleY: 1 }} exit={{ opacity: 0, scaleY: 0.8 }} transition={transition} className={dropPlaceholderClass} aria-hidden="true" />}{cards.map((card) => {
       const index = column.cardIds.indexOf(card.id);
       const canMoveUp = positionalEnabled && index > 0;
       const canMoveDown = positionalEnabled && index >= 0 && index < total - 1;
@@ -118,7 +115,7 @@ export function BoardColumn({ column, cards, activeForm, renaming, renameValue, 
       const dropAfter = positionalEnabled && dropTarget?.columnId === column.id && dropTarget.cardId === card.id && dropTarget.insertAfter;
       return <Fragment key={card.id}>{editingCardId === card.id
         ? <CardForm key="edit" mode="edit" initialDraft={cardToDraft(card)} onSave={(draft) => onSaveCardDraft(card.id, draft)} onCancel={onCancelEditCard} />
-        : <KanbanCard card={card} done={isDone} overdue={isCardOverdue(card, isDone)} expanded={expandedIds.has(card.id)} dragging={Boolean(draggedCardId)} dragged={draggedCardId === card.id} canMoveUp={canMoveUp} canMoveDown={canMoveDown} canMoveLeft={canMoveLeft} canMoveRight={canMoveRight} onDelete={onDeleteCard} onEdit={onEditCard} selected={selectedIds.has(card.id)} onToggleSelected={onToggleSelected} onToggleExpanded={onToggleExpanded} onMove={onMove} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragOver={(event, id) => onDragOver(event, id)} onDragEnter={(event, id) => onDragEnter(event, id)} onDragLeave={onDragLeave} onDrop={(event, id) => onDrop(event, id)} dropIndicator={dropBefore} />}{dropAfter && <motion.div initial={{ opacity: 0, scaleY: 0.8 }} animate={{ opacity: 1, scaleY: 1 }} transition={settle} className={dropPlaceholderClass} aria-hidden="true" />}</Fragment>;
+        : <KanbanCard card={card} done={isDone} overdue={isCardOverdue(card, isDone)} expanded={expandedIds.has(card.id)} dragging={Boolean(draggedCardId)} dragged={draggedCardId === card.id} canMoveUp={canMoveUp} canMoveDown={canMoveDown} canMoveLeft={canMoveLeft} canMoveRight={canMoveRight} onDelete={onDeleteCard} onEdit={onEditCard} selected={selectedIds.has(card.id)} onToggleSelected={onToggleSelected} onToggleExpanded={onToggleExpanded} onMove={onMove} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragOver={(event, id) => onDragOver(event, id)} onDragEnter={(event, id) => onDragEnter(event, id)} onDrop={(event, id) => onDrop(event, id)} dropIndicator={dropBefore} />}{dropAfter && <motion.div initial={{ opacity: 0, scaleY: 0.8 }} animate={{ opacity: 1, scaleY: 1 }} transition={transition} className={dropPlaceholderClass} aria-hidden="true" />}</Fragment>;
     })}</AnimatePresence>{total === 0 && !activeForm && <p className={emptyBay}>No cards in this column. File the first card.</p>}{total > 0 && cards.length === 0 && <p className={emptyBay}>No cards match the filter.</p>}</div>
     <AnimatePresence initial={false} mode="popLayout">{!collapsed && (activeForm ? <CardForm key="form" onSave={onSaveCard} onCancel={onCancelCardForm} /> : <Button key="add" variant="ghost" onClick={onStartCardForm} className="h-9 w-full justify-start rounded-ui border border-dashed border-line-strong px-2.5 text-[12px] font-medium text-muted hover:border-accent hover:text-accent"><IconPlus size={14} stroke={1.5} /> File card</Button>)}</AnimatePresence>
   </motion.section>;
