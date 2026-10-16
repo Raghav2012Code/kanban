@@ -15,6 +15,8 @@ export default {
         'line-control': 'var(--color-border-control)',
         'line-strong': 'var(--color-border-strong)',
         accent: 'var(--color-accent)',
+        'accent-strong': 'var(--color-accent-strong)',
+        'accent-soft': 'var(--color-accent-soft)',
         'accent-fg': 'var(--color-accent-fg)',
         hold: 'var(--color-hold)',
         cleared: 'var(--color-cleared)',
@@ -26,7 +28,7 @@ export default {
         mono: 'var(--font-mono)',
       },
       borderRadius: {
-        strip: '2px',
+        ui: '8px',
       },
       transitionTimingFunction: {
         out: 'var(--ease-out)',

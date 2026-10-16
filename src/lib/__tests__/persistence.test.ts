@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeAnalytics } from '../analytics';
-import { CORRUPT_STORAGE_KEY, STORAGE_KEY } from '../constants';
+import { CORRUPT_STORAGE_KEY, LEGACY_STORAGE_KEY, STORAGE_KEY } from '../constants';
 import { createSeedState, isValidBoard, loadBoardState, persistBoardState } from '../persistence';
 import type { BoardState } from '../../types/kanban';
 
@@ -103,6 +103,21 @@ describe('loadBoardState', () => {
     expect(result.status).toBe('loaded');
     expect(result.board).toEqual(seed);
     expect(result.board.columns.every((column) => column.limit === undefined)).toBe(true);
+  });
+
+  it('loads a board saved under the legacy name, so the rename loses no work', () => {
+    const seed = createSeedState(new Date(2026, 8, 25));
+    const result = loadBoardState(memoryStorage({ [LEGACY_STORAGE_KEY]: JSON.stringify(seed) }));
+    expect(result.status).toBe('loaded');
+    expect(result.board).toEqual(seed);
+  });
+
+  it('prefers the current key when a board exists under both names', () => {
+    const current = createSeedState(new Date(2026, 8, 25));
+    current.cards['card-tax'] = { ...current.cards['card-tax'], title: 'Current board' };
+    const legacy = createSeedState(new Date(2026, 8, 25));
+    const storage = memoryStorage({ [STORAGE_KEY]: JSON.stringify(current), [LEGACY_STORAGE_KEY]: JSON.stringify(legacy) });
+    expect(loadBoardState(storage).board.cards['card-tax']?.title).toBe('Current board');
   });
 
   it('rejects a malformed limit rather than quietly ignoring it', () => {

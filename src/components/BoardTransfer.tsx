@@ -46,12 +46,12 @@ export function BoardTransfer({ board, onReplace, onResult }: BoardTransferProps
   };
 
   return (
-    <div className="flex items-center gap-1">
-      <Button variant="outline" size="icon" onClick={() => downloadBoard(board)} aria-label="Export board" title="Export the board as JSON" className="h-9 w-9">
-        <IconDownload size={14} stroke={1.5} />
+    <div className="relative flex items-center gap-1.5">
+      <Button variant="outline" size="icon" onClick={() => downloadBoard(board)} aria-label="Export board" title="Export the board as JSON">
+        <IconDownload size={15} stroke={1.5} />
       </Button>
-      <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} aria-label="Import board" title="Import a board from JSON" className="h-9 w-9">
-        <IconUpload size={14} stroke={1.5} />
+      <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} aria-label="Import board" title="Import a board from JSON">
+        <IconUpload size={15} stroke={1.5} />
       </Button>
       <input
         ref={fileInputRef}
@@ -65,10 +65,12 @@ export function BoardTransfer({ board, onReplace, onResult }: BoardTransferProps
         }}
       />
       {pending ? (
-        <div role="status" className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wide text-muted">
-          <span>Replace this board?</span>
-          <Button variant="outline" size="sm" onClick={confirmImport}>Import</Button>
-          <Button variant="ghost" size="sm" onClick={() => setPending(null)}>Cancel</Button>
+        <div role="status" className="absolute right-0 top-full z-30 mt-2 w-60 rounded-ui border border-line bg-surface p-3 shadow-lg">
+          <p className="text-[13px] leading-5 text-ink">Replace this board?</p>
+          <div className="mt-2.5 flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setPending(null)}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={confirmImport}>Import</Button>
+          </div>
         </div>
       ) : null}
     </div>

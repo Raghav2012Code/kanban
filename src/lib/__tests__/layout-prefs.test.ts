@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COLLAPSED_COLUMNS_KEY } from '../constants';
+import { COLLAPSED_COLUMNS_KEY, LEGACY_COLLAPSED_COLUMNS_KEY, LEGACY_STORAGE_KEY, STORAGE_KEY } from '../constants';
 import { loadCollapsedIds, saveCollapsedIds } from '../layout-prefs';
 
 function memoryStorage(initial: Record<string, string> = {}): Storage {
@@ -29,8 +29,13 @@ describe('collapsed column preference', () => {
 
   it('lives under its own key, never alongside the board', () => {
     const storage = memoryStorage({ [COLLAPSED_COLUMNS_KEY]: '["column-todo"]' });
-    // The board key is untouched by anything this module does.
-    expect(storage.getItem('noir_kanban_state')).toBeNull();
+    // The board keys, current and legacy, are untouched by anything this module does.
+    expect(storage.getItem(STORAGE_KEY)).toBeNull();
+    expect(storage.getItem(LEGACY_STORAGE_KEY)).toBeNull();
+  });
+
+  it('reads a preference saved under the legacy name, so the rename loses no setup', () => {
+    expect([...loadCollapsedIds(memoryStorage({ [LEGACY_COLLAPSED_COLUMNS_KEY]: '["column-todo"]' }))]).toEqual(['column-todo']);
   });
 
   it('treats missing, malformed, and unusable values as nothing collapsed', () => {

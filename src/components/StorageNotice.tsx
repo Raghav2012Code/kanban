@@ -16,5 +16,5 @@ interface StorageNoticeProps {
 
 export function StorageNotice({ warning, onDismiss }: StorageNoticeProps): JSX.Element | null {
   if (!warning) return null;
-  return <div role="status" aria-live="polite" className="mb-4 flex items-start gap-3 rounded-strip border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-warn"><IconAlertTriangle size={14} stroke={1.5} aria-hidden="true" className="mt-0.5 shrink-0" /><p className="min-w-0 flex-1 leading-5">{messages[warning.kind]}</p><Button variant="ghost" size="icon" onClick={onDismiss} aria-label="Dismiss storage warning" className="h-5 w-5 text-warn hover:bg-warn/15 hover:text-warn"><IconX size={12} stroke={1.5} /></Button></div>;
+  return <div role="status" aria-live="polite" className="mb-4 flex items-start gap-3 rounded-ui border border-warn bg-surface px-3 py-2.5 text-xs text-warn shadow-sm"><IconAlertTriangle size={15} stroke={1.5} aria-hidden="true" className="mt-0.5 shrink-0" /><p className="min-w-0 flex-1 leading-5">{messages[warning.kind]}</p><Button variant="ghost" size="icon" onClick={onDismiss} aria-label="Dismiss storage warning" className="h-6 w-6 text-warn hover:bg-raised hover:text-hold"><IconX size={13} stroke={1.5} /></Button></div>;
 }

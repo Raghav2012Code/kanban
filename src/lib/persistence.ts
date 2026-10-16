@@ -1,5 +1,5 @@
 import { addDays, isValidDateString, localDateString } from './dates';
-import { CORRUPT_STORAGE_KEY, PRIORITIES, STORAGE_KEY } from './constants';
+import { CORRUPT_STORAGE_KEY, LEGACY_STORAGE_KEY, PRIORITIES, STORAGE_KEY } from './constants';
 import type { BoardState, CardItem } from '../types/kanban';
 
 const DAY_MS = 86_400_000;
@@ -85,7 +85,9 @@ export function loadBoardState(storage: Storage | null = getStorage()): LoadBoar
 
   let stored: string | null;
   try {
-    stored = storage.getItem(STORAGE_KEY);
+    // A board saved under the legacy name is read once and thereafter written
+    // back under the current key, so the rename loses no work.
+    stored = storage.getItem(STORAGE_KEY) ?? storage.getItem(LEGACY_STORAGE_KEY);
   } catch {
     return { board: createSeedState(), status: 'unavailable' };
   }
