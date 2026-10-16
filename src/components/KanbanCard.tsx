@@ -3,6 +3,7 @@ import { IconAlertTriangle, IconArrowDown, IconArrowLeft, IconArrowRight, IconAr
 import type { DragEvent } from 'react';
 import { useMotionTransition } from '@/hooks/useMotionTransition';
 import { formatDueDate, formatFiledDate } from '@/lib/dates';
+import { reducedMotionTransition } from '@/lib/motion';
 import { tailNumber } from '@/lib/ids';
 import { cn } from '@/lib/utils';
 import type { CardItem } from '@/types/kanban';
@@ -16,6 +17,10 @@ interface KanbanCardProps {
   done: boolean;
   overdue: boolean;
   expanded: boolean;
+  /** True while any card is being dragged: the tile goes inert and stops animating. */
+  dragging?: boolean;
+  /** True for the card being dragged: it reads as in flight while its ghost moves. */
+  dragged?: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
   canMoveLeft: boolean;
@@ -48,12 +53,16 @@ const moveControls: { direction: MoveDirection; label: string; Icon: typeof Icon
   { direction: 'right', label: 'to the next column', Icon: IconArrowRight, can: 'canMoveRight' },
 ];
 
-export function KanbanCard({ card, done, overdue, expanded, canMoveUp, canMoveDown, canMoveLeft, canMoveRight, onDelete, onEdit, selected, onToggleSelected, onToggleExpanded, onMove, onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop, dropIndicator }: KanbanCardProps): JSX.Element {
+export function KanbanCard({ card, done, overdue, expanded, dragging = false, dragged = false, canMoveUp, canMoveDown, canMoveLeft, canMoveRight, onDelete, onEdit, selected, onToggleSelected, onToggleExpanded, onMove, onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop, dropIndicator }: KanbanCardProps): JSX.Element {
   const transition = useMotionTransition();
+  // Under the drag, positions snap instead of animating; the board settles once
+  // when the card lands. Retargeting a tween on every slot change is what made
+  // the board wobble under the cursor.
+  const settle = dragging ? reducedMotionTransition : transition;
   const canMove = { canMoveUp, canMoveDown, canMoveLeft, canMoveRight };
   return <>
-    {dropIndicator && <motion.div initial={{ opacity: 0, scaleY: 0.8 }} animate={{ opacity: 1, scaleY: 1 }} transition={transition} className={dropPlaceholderClass} aria-hidden="true" />}
-    <motion.div layout transition={transition} draggable onDragStart={(event) => onDragStart(event as unknown as DragEvent<HTMLElement>, card.id)} onDragEnd={onDragEnd} onDragOver={(event) => { event.stopPropagation(); onDragOver(event, card.id); }} onDragEnter={(event) => { event.stopPropagation(); onDragEnter(event, card.id); }} onDragLeave={onDragLeave} onDrop={(event) => { event.stopPropagation(); onDrop(event, card.id); }} role="group" aria-label={card.title} className={cn('group relative flex flex-col rounded-ui border border-line bg-surface p-2.5 shadow-sm transition-shadow hover:shadow-md', selected && 'border-accent bg-accent-soft')}>
+    {dropIndicator && <motion.div initial={{ opacity: 0, scaleY: 0.8 }} animate={{ opacity: 1, scaleY: 1 }} transition={settle} className={dropPlaceholderClass} aria-hidden="true" />}
+    <motion.div layout transition={settle} draggable onDragStart={(event) => onDragStart(event as unknown as DragEvent<HTMLElement>, card.id)} onDragEnd={onDragEnd} onDragOver={(event) => { event.stopPropagation(); onDragOver(event, card.id); }} onDragEnter={(event) => { event.stopPropagation(); onDragEnter(event, card.id); }} onDragLeave={onDragLeave} onDrop={(event) => { event.stopPropagation(); onDrop(event, card.id); }} role="group" aria-label={card.title} className={cn('group relative flex flex-col rounded-ui border border-line bg-surface p-2.5 shadow-sm', !dragging && 'transition-shadow hover:shadow-md', dragged && 'opacity-40', selected && 'border-accent bg-accent-soft')}>
       <div className="flex items-start gap-2">
         {/* A 28px button wrapping a visually smaller box, so the hit area meets the
             control target floor rather than shipping a 14px target. It is not hidden
@@ -105,7 +114,7 @@ export function KanbanCard({ card, done, overdue, expanded, canMoveUp, canMoveDo
           </>}
         </div>
       </div>
-      <div className={cn('flex items-center justify-end gap-0.5', '[@media(hover:hover)_and_(min-width:768px)]:absolute [@media(hover:hover)_and_(min-width:768px)]:right-1.5 [@media(hover:hover)_and_(min-width:768px)]:top-1.5 [@media(hover:hover)_and_(min-width:768px)]:rounded-ui [@media(hover:hover)_and_(min-width:768px)]:border [@media(hover:hover)_and_(min-width:768px)]:border-line [@media(hover:hover)_and_(min-width:768px)]:bg-surface [@media(hover:hover)_and_(min-width:768px)]:p-0.5 [@media(hover:hover)_and_(min-width:768px)]:shadow-md', revealControl)}>
+      <div className={cn('flex items-center justify-end gap-0.5', !dragging && '[@media(hover:hover)_and_(min-width:768px)]:absolute [@media(hover:hover)_and_(min-width:768px)]:right-1.5 [@media(hover:hover)_and_(min-width:768px)]:top-1.5 [@media(hover:hover)_and_(min-width:768px)]:rounded-ui [@media(hover:hover)_and_(min-width:768px)]:border [@media(hover:hover)_and_(min-width:768px)]:border-line [@media(hover:hover)_and_(min-width:768px)]:bg-surface [@media(hover:hover)_and_(min-width:768px)]:p-0.5 [@media(hover:hover)_and_(min-width:768px)]:shadow-md', dragging ? 'pointer-events-none opacity-0' : revealControl)}>
         {moveControls.map(({ direction, label, Icon, can }) => <Button key={direction} variant="ghost" size="icon" onClick={() => onMove(card.id, direction)} disabled={!canMove[can]} aria-label={`Move ${card.title} ${label}`} title={`Move ${label}`} className="h-7 w-7 text-muted hover:text-ink"><Icon size={14} stroke={1.5} /></Button>)}
         <Button variant="ghost" size="icon" onClick={() => onEdit(card.id)} aria-label={`Edit ${card.title}`} title="Edit card" className="h-7 w-7 text-muted hover:text-ink"><IconPencil size={14} stroke={1.5} /></Button>
         <Button variant="destructive" size="icon" onClick={() => onDelete(card.id)} aria-label={`Delete ${card.title}`} title="Delete card" className="h-7 w-7"><IconTrash size={14} stroke={1.5} /></Button>

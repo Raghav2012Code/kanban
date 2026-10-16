@@ -272,7 +272,19 @@ export default function KanbanBoard(): JSX.Element {
     setColumnNotice(null);
     updateBoard((current) => ({ ...current, columns: current.columns.filter((item) => item.id !== column.id) }));
   };
-  const clearDrag = () => { setDraggedCardId(null); setDropTarget(null); };
+  const clearDrag = () => { setDraggedCardId(null); updateDropTarget(null); };
+  /**
+   * Drop targets only change when the resolved slot actually changes. A dragover
+   * that stays within the same slot must not re-render the board — and with a
+   * fresh object per event it did, dozens of times a second, re-measuring every
+   * animated element under the cursor. That re-render churn is what made a
+   * reorder drag stutter.
+   */
+  const updateDropTarget = (next: DropTarget | null) => setDropTarget((current) => {
+    if (current === next) return current;
+    if (current && next && current.columnId === next.columnId && current.cardId === next.cardId && Boolean(current.insertAfter) === Boolean(next.insertAfter)) return current;
+    return next;
+  });
   const handleDragStart = (event: DragEvent<HTMLElement>, cardId: string) => {
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', cardId);
@@ -281,13 +293,13 @@ export default function KanbanBoard(): JSX.Element {
   const handleDragOver = (event: DragEvent<HTMLElement>, columnId: string, cardId?: string) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
-    if (!positionalEnabled || !cardId) { setDropTarget({ columnId }); return; }
+    if (!positionalEnabled || !cardId) { updateDropTarget({ columnId }); return; }
     const rect = event.currentTarget.getBoundingClientRect();
-    setDropTarget({ columnId, cardId, insertAfter: resolveInsertAfter(event.clientY, rect.top, rect.height) });
+    updateDropTarget({ columnId, cardId, insertAfter: resolveInsertAfter(event.clientY, rect.top, rect.height) });
   };
   const handleDragLeave = (event: DragEvent<HTMLElement>) => {
     const related = event.relatedTarget;
-    if (!(related instanceof Node) || !event.currentTarget.contains(related)) setDropTarget(null);
+    if (!(related instanceof Node) || !event.currentTarget.contains(related)) updateDropTarget(null);
   };
   // A dropped card is announced exactly like an arrow-key move, because a drag is a
   // move and a person who cannot see the drop happening needs the same confirmation.
