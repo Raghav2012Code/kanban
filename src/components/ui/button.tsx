@@ -2,17 +2,17 @@ import { forwardRef, type ButtonHTMLAttributes } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
-const buttonVariants = cva('inline-flex items-center justify-center gap-1.5 rounded-strip font-body text-sm font-medium transition-[background-color,border-color,color,transform] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40', {
+const buttonVariants = cva('inline-flex items-center justify-center gap-1.5 rounded-ui font-body text-sm font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40', {
   variants: {
     variant: {
-      default: 'bg-accent text-accent-fg hover:bg-accent/90',
+      default: 'bg-accent text-accent-fg shadow-sm hover:bg-accent-strong',
       ghost: 'text-muted hover:bg-raised hover:text-ink',
-      outline: 'border border-line-strong text-muted hover:border-accent hover:text-ink',
-      destructive: 'text-faint hover:bg-raised hover:text-hold',
+      outline: 'border border-line-control bg-surface text-ink shadow-sm hover:border-accent hover:text-accent',
+      destructive: 'text-muted hover:bg-raised hover:text-hold',
     },
     size: {
-      default: 'px-3 py-2',
-      sm: 'px-2.5 py-1.5 text-xs',
+      default: 'h-9 px-3',
+      sm: 'h-8 px-2.5 text-[13px]',
       icon: 'h-8 w-8',
     },
   },

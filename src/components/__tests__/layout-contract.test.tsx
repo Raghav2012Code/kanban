@@ -11,8 +11,8 @@ import KanbanBoard from '../../KanbanBoard';
  * obvious one. This is a recorded deviation and is labelled as one.
  *
  * The rule is that a transient panel appearing in the board row must reserve the
- * footprint of the control that opens it, so opening it cannot reflow the bays.
- * The obvious test renders the board, records the bay widths, opens the panel,
+ * footprint of the control that opens it, so opening it cannot reflow the columns.
+ * The obvious test renders the board, records the column widths, opens the panel,
  * records them again, and compares. That test cannot run here: the suite has no
  * layout engine, so every element measures zero and the assertion would pass no
  * matter what the CSS said. A check that cannot fail is worse than no check,
@@ -55,12 +55,12 @@ beforeEach(() => {
   window.localStorage.clear();
 });
 
-describe('the add-bay footprint', () => {
+describe('the add-column footprint', () => {
   it('reserves the collapsed trigger width in the expanded form', async () => {
     const user = userEvent.setup();
     render(<KanbanBoard />);
 
-    const trigger = screen.getByRole('button', { name: /add bay/i });
+    const trigger = screen.getByRole('button', { name: /add column/i });
     const triggerWidths = responsiveWidths(trigger);
     expect(triggerWidths.length, 'the collapsed trigger must reserve a width at a breakpoint').toBeGreaterThan(0);
 
@@ -71,7 +71,7 @@ describe('the add-bay footprint', () => {
     expect(panelWidths, 'the expanded form must reserve a width at a breakpoint').not.toEqual([]);
     expect(
       panelWidths,
-      'the expanded form must occupy the same width as the control that opens it, or every bay resizes',
+      'the expanded form must occupy the same width as the control that opens it, or every column resizes',
     ).toEqual(triggerWidths);
   });
 
@@ -79,12 +79,12 @@ describe('the add-bay footprint', () => {
     const user = userEvent.setup();
     render(<KanbanBoard />);
 
-    expect(hasClass(screen.getByLabelText('Backlog column'), 'lg:flex-1'), 'the bays are the flexible items in the row').toBe(true);
+    expect(hasClass(screen.getByLabelText('Backlog column'), 'lg:flex-1'), 'the columns are the flexible items in the row').toBe(true);
 
-    await user.click(screen.getByRole('button', { name: /add bay/i }));
+    await user.click(screen.getByRole('button', { name: /add column/i }));
     const panel = nearestReservedAncestor(screen.getByLabelText('New column name'));
 
-    // A panel that grew would have to take the space from somewhere. The bays are the
+    // A panel that grew would have to take the space from somewhere. The columns are the
     // only flexible neighbours, so the panel must be the one that refuses to grow.
     expect(hasClass(panel, 'lg:flex-none'), 'the panel must refuse to grow').toBe(true);
     expect(hasClass(panel, 'lg:flex-1'), 'the panel must never be the flexible item').toBe(false);
@@ -108,7 +108,7 @@ describe('the horizontal overflow gate', () => {
     expect(offenders, 'a minimum-width floor on the document is what forces the page to scroll sideways').toEqual([]);
   });
 
-  it('keeps the bay row the only horizontal scroll container, so the page does not move', () => {
+  it('keeps the column row the only horizontal scroll container, so the page does not move', () => {
     const { container } = render(<KanbanBoard />);
 
     expect(
@@ -119,7 +119,7 @@ describe('the horizontal overflow gate', () => {
     const scrollable = [...container.querySelectorAll('*')].filter((element) =>
       element.getAttribute('class')?.includes('overflow-x-auto'),
     );
-    expect(scrollable.length, 'the bay row must be a horizontal scroll container').toBeGreaterThan(0);
+    expect(scrollable.length, 'the column row must be a horizontal scroll container').toBeGreaterThan(0);
   });
 });
 
