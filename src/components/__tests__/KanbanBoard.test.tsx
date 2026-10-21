@@ -1209,6 +1209,89 @@ describe('KanbanBoard bulk move', () => {
   });
 });
 
+describe('KanbanBoard bulk delete', () => {
+  const selectCards = async (user: ReturnType<typeof userEvent.setup>, titles: string[]) => {
+    for (const title of titles) {
+      await user.click(screen.getByRole('checkbox', { name: `Select ${title}` }));
+    }
+  };
+
+  const cardNamesIn = (column: string): string[] =>
+    within(screen.getByLabelText(column))
+      .queryAllByRole('group')
+      .map((card) => card.getAttribute('aria-label') ?? '');
+
+  it('announces a single deletion by naming the card', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await user.click(screen.getByRole('button', { name: 'Delete Plan weekly groceries' }));
+
+    expect(cardNamesIn('To Do column')).toEqual(['Book dentist appointment', 'Organize reading list']);
+    expect(await screen.findByRole('status')).toHaveTextContent('Deleted Plan weekly groceries.');
+  });
+
+  it('deletes several selected cards in one action and announces the count', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await selectCards(user, ['Organize reading list', 'Plan weekly groceries']);
+    await user.click(screen.getByRole('button', { name: 'Delete 2 selected cards' }));
+
+    expect(cardNamesIn('To Do column')).toEqual(['Book dentist appointment']);
+    expect(await screen.findByRole('status')).toHaveTextContent('Deleted 2 cards.');
+    // The removed cards leave the selection with them.
+    expect(screen.queryByRole('button', { name: /selected cards/ })).not.toBeInTheDocument();
+  });
+
+  it('restores the whole batch to its columns and positions with one undo', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+    const todoBefore = cardNamesIn('To Do column');
+
+    await selectCards(user, ['Plan weekly groceries', 'Set up photo backup']);
+    await user.click(screen.getByRole('button', { name: 'Delete 2 selected cards' }));
+    expect(cardNamesIn('Backlog column')).toEqual(['Research personal finance apps']);
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+
+    expect(cardNamesIn('Backlog column')).toEqual(['Research personal finance apps', 'Set up photo backup']);
+    expect(cardNamesIn('To Do column')).toEqual(todoBefore);
+  });
+
+  it('offers a Done clear control only while the column holds cards', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('Done column');
+
+    await user.click(screen.getByRole('button', { name: 'Clear 1 finished card from Done' }));
+
+    expect(cardNamesIn('Done column')).toEqual([]);
+    expect(await screen.findByRole('status')).toHaveTextContent('Cleared 1 finished card.');
+    expect(screen.queryByRole('button', { name: /Clear \d+ finished card/ })).not.toBeInTheDocument();
+  });
+
+  it('clears the whole Done column under a filter, including hidden cards', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('Done column');
+
+    // Nothing in Done matches, so the column reads empty while still holding a card.
+    await user.type(screen.getByLabelText('Search cards by title or description'), 'groceries');
+    expect(cardNamesIn('Done column')).toEqual([]);
+
+    // The control states the whole column's count, and the announcement agrees.
+    await user.click(screen.getByRole('button', { name: 'Clear 1 finished card from Done' }));
+
+    await user.clear(screen.getByLabelText('Search cards by title or description'));
+    expect(cardNamesIn('Done column')).toEqual([]);
+    expect(await screen.findByRole('status')).toHaveTextContent('Cleared 1 finished card.');
+  });
+});
+
 describe('KanbanBoard column ordering', () => {
   it('reorders the columns, carrying each column cards with it', async () => {
     const user = userEvent.setup();

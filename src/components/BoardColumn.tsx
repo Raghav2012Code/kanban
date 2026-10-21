@@ -42,6 +42,7 @@ interface BoardColumnProps {
   onSaveRename: () => void;
   onCancelRename: () => void;
   onDeleteColumn: () => void;
+  onClearDoneColumn?: () => void;
   onDeleteCard: (id: string) => void;
   onEditCard: (id: string) => void;
   editingCardId: string | null;
@@ -69,7 +70,7 @@ interface BoardColumnProps {
   onDrop: (event: DragEvent<HTMLElement>, cardId?: string) => void;
 }
 
-export function BoardColumn({ column, cards, activeForm, renaming, renameValue, draggedCardId, dropTarget, positionalEnabled, canMoveLeft, canMoveRight, onStartCardForm, onSaveCard, onCancelCardForm, onBeginRename, onRenameChange, onSaveRename, onCancelRename, onDeleteColumn, onDeleteCard, onEditCard, editingCardId, onSaveCardDraft, onCancelEditCard, onMoveColumn, selectedIds, onToggleSelected, collapsed, onToggleCollapsed, settingLimit, limitValue, onStartLimit, onLimitChange, onSaveLimit, onCancelLimit, onMove, expandedIds, onToggleExpanded, onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop }: BoardColumnProps): JSX.Element {
+export function BoardColumn({ column, cards, activeForm, renaming, renameValue, draggedCardId, dropTarget, positionalEnabled, canMoveLeft, canMoveRight, onStartCardForm, onSaveCard, onCancelCardForm, onBeginRename, onRenameChange, onSaveRename, onCancelRename, onDeleteColumn, onClearDoneColumn, onDeleteCard, onEditCard, editingCardId, onSaveCardDraft, onCancelEditCard, onMoveColumn, selectedIds, onToggleSelected, collapsed, onToggleCollapsed, settingLimit, limitValue, onStartLimit, onLimitChange, onSaveLimit, onCancelLimit, onMove, expandedIds, onToggleExpanded, onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop }: BoardColumnProps): JSX.Element {
   const renameRef = useRef<HTMLInputElement>(null);
   const limitRef = useRef<HTMLInputElement>(null);
   // Positions glide on the house tween, during a drag as much as after it: the
@@ -101,6 +102,10 @@ export function BoardColumn({ column, cards, activeForm, renaming, renameValue, 
       {settingLimit
         ? <Input ref={limitRef} type="number" min={0} value={limitValue} onChange={(event) => onLimitChange(event.target.value)} onBlur={onSaveLimit} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key === 'Enter') onSaveLimit(); if (event.key === 'Escape') onCancelLimit(); }} aria-label={`Work In Progress limit for ${column.title}`} title="Leave empty for no limit" className="h-7 w-14 shrink-0 px-1 text-center font-mono text-sm" />
         : <><span title={countTitle} className={cn('shrink-0 font-mono text-[11px] tabular-nums', overLimit ? 'font-semibold text-hold' : 'text-faint')}>{countLabel}</span>{overLimit && <span className="shrink-0 rounded-full border border-hold px-1.5 py-px font-mono text-[10px] font-semibold uppercase tracking-wide text-hold">Over</span>}<Button variant="ghost" size="icon" onClick={onStartLimit} aria-label={`Set Work In Progress limit for ${column.title}`} title={hasLimit ? `Limit ${column.limit}` : 'No limit set'} className="h-7 w-7 text-faint hover:text-ink"><IconGauge size={14} stroke={1.5} /></Button></>}
+      {/* The Done column's clear control names the whole column's count, never the */}
+      {/* visible subset, so clearing under a filter cannot surprise. It exists only */}
+      {/* while the column holds cards, so the header never offers an empty action. */}
+      {onClearDoneColumn && <Button variant="ghost" size="sm" onClick={onClearDoneColumn} aria-label={total === 1 ? `Clear 1 finished card from ${column.title}` : `Clear ${total} finished cards from ${column.title}`} title={`Remove all ${total} cards from ${column.title}`} className="h-7 shrink-0 px-1.5 font-mono text-[11px] uppercase tracking-wide text-faint hover:text-ink">Clear {total}</Button>}
       <span aria-hidden="true" className="flex-1" />
       <Button variant="ghost" size="icon" onClick={onToggleCollapsed} aria-expanded={!collapsed} aria-controls={bodyId} aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${column.title} column`} title={collapsed ? 'Expand column' : 'Collapse column'} className="h-7 w-7 text-faint hover:text-ink">{collapsed ? <IconChevronRight size={14} stroke={1.5} /> : <IconChevronDown size={14} stroke={1.5} />}</Button>
       <Button variant="ghost" size="icon" onClick={() => onMoveColumn('left')} disabled={!canMoveLeft} aria-label={`Move ${column.title} column left`} title="Move column left" className="h-7 w-7 text-faint hover:text-ink"><IconArrowLeft size={14} stroke={1.5} /></Button>

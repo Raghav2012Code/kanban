@@ -13,7 +13,8 @@ import { TopBar } from './components/TopBar';
 import { useKanbanBoard } from './hooks/useKanbanBoard';
 import { useMotionTransition } from './hooks/useMotionTransition';
 import { computeAnalytics } from './lib/analytics';
-import { adjacentColumnOf, addCard as addCardToBoard, isColumnAtLimit, moveCard, moveCardsInto, moveCardToAdjacentColumn, moveCardWithinColumn, moveColumnToAdjacent, pruneExpandedIds, removeCard, resolveInsertAfter, updateCard } from './lib/board';
+import { adjacentColumnOf, addCard as addCardToBoard, isColumnAtLimit, moveCard, moveCardsInto, moveCardToAdjacentColumn, moveCardWithinColumn, moveColumnToAdjacent, pruneRemovedIds, removeCard, removeCards, resolveInsertAfter, updateCard } from './lib/board';
+import { getDoneColumn } from './lib/done';
 import { isViewActive, visibleByColumn as computeVisibleByColumn } from './lib/filter';
 import type { FilterCriteria } from './lib/filter';
 import { sortCardIds } from './lib/sort';
@@ -125,16 +126,59 @@ export default function KanbanBoard(): JSX.Element {
     setRenameValue('');
   };
   const deleteCard = (cardId: string) => {
+    const card = board.cards[cardId];
+    if (!card) return;
     updateBoard((current) => removeCard(current, cardId));
-    setExpandedIds((current) => pruneExpandedIds(current, cardId));
-    setDropTarget((current) => (current?.cardId === cardId ? { columnId: current.columnId } : current));
-    setDraggedCardId((current) => (current === cardId ? null : current));
+    pruneViewStateFor([cardId]);
+    announce(`Deleted ${card.title}.`);
+  };
+  // A removed card must vanish from every piece of view state that referred to
+  // it, or the board holds a selection, an expansion, or a drag for a card that
+  // no longer exists.
+  const pruneViewStateFor = (removedIds: string[]) => {
+    const doomed = new Set(removedIds);
     setSelectedIds((current) => {
-      if (!current.has(cardId)) return current;
-      const next = new Set(current);
-      next.delete(cardId);
-      return next;
+      let next: Set<string> | null = null;
+      for (const id of doomed) {
+        if ((next ?? current).has(id)) {
+          next ??= new Set(current);
+          next.delete(id);
+        }
+      }
+      return next ?? current;
     });
+    setExpandedIds((current) => pruneRemovedIds(current, doomed));
+    setDraggedCardId((current) => (current && doomed.has(current) ? null : current));
+    setDropTarget((current) => (current?.cardId && doomed.has(current.cardId) ? { columnId: current.columnId } : current));
+  };
+  // Selection is explicit intent, so no confirmation is asked for: the group
+  // leaves as one recorded mutation and one undo brings it all back.
+  const deleteSelected = () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    const removed = removeCards(board, ids);
+    if (removed === board) {
+      announce(null);
+      setSelectedIds(new Set());
+      return;
+    }
+    const names = ids.map((id) => board.cards[id]?.title).filter(Boolean);
+    announce(ids.length === 1 && names[0] ? `Deleted ${names[0]}.` : `Deleted ${ids.length} cards.`);
+    updateBoard(() => removed);
+    pruneViewStateFor(ids);
+  };
+  // Clearing acts on the whole column, never on the visible subset: under a
+  // filter, removing only what is shown would leave hidden cards to reappear
+  // the moment the filter is lifted.
+  const clearDoneColumn = () => {
+    const done = getDoneColumn(board);
+    if (!done || done.cardIds.length === 0) return;
+    const count = done.cardIds.length;
+    const cleared = removeCards(board, done.cardIds);
+    if (cleared === board) return;
+    announce(count === 1 ? 'Cleared 1 finished card.' : `Cleared ${count} finished cards.`);
+    updateBoard(() => cleared);
+    pruneViewStateFor(done.cardIds);
   };
   // Every outcome is announced through the board's one existing notice channel, so
   // a move, a refusal, and a limit all reach assistive technology the same way and
@@ -399,7 +443,10 @@ export default function KanbanBoard(): JSX.Element {
             </Button>
           ))}
         </span>
-        <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} aria-label="Clear selection" className="ml-auto font-mono text-[11px] uppercase tracking-wide">
+        <Button variant="destructive" size="sm" onClick={deleteSelected} aria-label={`Delete ${selectedIds.size} selected cards`} className="ml-auto font-mono text-[11px] uppercase tracking-wide">
+          Delete
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} aria-label="Clear selection" className="font-mono text-[11px] uppercase tracking-wide">
           Clear
         </Button>
       </div>
@@ -458,6 +505,7 @@ export default function KanbanBoard(): JSX.Element {
               onSaveRename={saveRename}
               onCancelRename={() => setRenamingColumn(null)}
               onDeleteColumn={() => requestDeleteColumn(column)}
+              onClearDoneColumn={column.id === getDoneColumn(board)?.id && column.cardIds.length > 0 ? clearDoneColumn : undefined}
               onDeleteCard={deleteCard}
               onEditCard={beginEditCard}
               editingCardId={editingCardId}
