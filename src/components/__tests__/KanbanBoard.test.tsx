@@ -1349,6 +1349,81 @@ describe('KanbanBoard bulk delete', () => {
   });
 });
 
+describe('KanbanBoard deletion undo', () => {
+  const cardNamesIn = (column: string): string[] =>
+    within(screen.getByLabelText(column))
+      .queryAllByRole('group')
+      .map((card) => card.getAttribute('aria-label') ?? '');
+
+  it('offers Undo after a single deletion, restoring the card and closing the notice', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await user.click(screen.getByRole('button', { name: 'Delete Plan weekly groceries' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Deleted Plan weekly groceries.');
+    expect(cardNamesIn('To Do column')).toEqual(['Book dentist appointment', 'Organize reading list']);
+
+    await user.click(screen.getByRole('button', { name: 'Undo deletion' }));
+
+    expect(cardNamesIn('To Do column')).toEqual([
+      'Plan weekly groceries',
+      'Book dentist appointment',
+      'Organize reading list',
+    ]);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('restores a cleared Done column with one undo', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('Done column');
+
+    await user.click(screen.getByRole('button', { name: 'Clear 1 finished card from Done' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Cleared 1 finished card.');
+
+    await user.click(screen.getByRole('button', { name: 'Undo deletion' }));
+
+    expect(cardNamesIn('Done column')).toEqual(['Archive tax documents']);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('drops a stale Undo after a later board mutation, so it can never revert the wrong action', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await user.click(screen.getByRole('button', { name: 'Delete Plan weekly groceries' }));
+    expect(await screen.findByRole('button', { name: 'Undo deletion' })).toBeInTheDocument();
+
+    // A later mutation moves the board on: the deletion claim is no longer true.
+    await user.click(screen.getByRole('button', { name: 'Move Organize reading list up' }));
+
+    expect(screen.queryByRole('button', { name: 'Undo deletion' })).not.toBeInTheDocument();
+    // The move announces itself instead: the strip never shows a claim it cannot honour.
+    expect(await screen.findByRole('status')).toHaveTextContent('Moved Organize reading list up');
+  });
+
+  it('keeps a valid Undo across a view change alone', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await user.click(screen.getByRole('button', { name: 'Delete Plan weekly groceries' }));
+    // A filter is a view, not a mutation, so the deletion claim still holds.
+    await user.type(screen.getByLabelText('Search cards by title or description'), 'dentist');
+    expect(await screen.findByRole('button', { name: 'Undo deletion' })).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText('Search cards by title or description'));
+    await user.click(screen.getByRole('button', { name: 'Undo deletion' }));
+    expect(cardNamesIn('To Do column')).toEqual([
+      'Plan weekly groceries',
+      'Book dentist appointment',
+      'Organize reading list',
+    ]);
+  });
+});
+
 describe('KanbanBoard priority sort', () => {
   const cardNamesIn = (column: string): string[] =>
     within(screen.getByLabelText(column))
