@@ -150,6 +150,7 @@ describe('KanbanBoard filtered move safety', () => {
     ['a column title', async (user: ReturnType<typeof userEvent.setup>) => user.type(screen.getByLabelText('Filter by column title'), 'To Do')],
     ['a filed window', async (user: ReturnType<typeof userEvent.setup>) => user.selectOptions(screen.getByLabelText('Filter by filed window'), '7')],
     ['a sort', async (user: ReturnType<typeof userEvent.setup>) => user.selectOptions(screen.getByLabelText('Sort cards'), 'dueDate')],
+    ['a priority sort', async (user: ReturnType<typeof userEvent.setup>) => user.selectOptions(screen.getByLabelText('Sort cards'), 'priority')],
   ])('disables positional moves under %s, not just a text query', async (_label, apply) => {
     const user = userEvent.setup();
     boardForEveryDimension();
@@ -1345,6 +1346,34 @@ describe('KanbanBoard bulk delete', () => {
     await user.clear(screen.getByLabelText('Search cards by title or description'));
     expect(cardNamesIn('Done column')).toEqual([]);
     expect(await screen.findByRole('status')).toHaveTextContent('Cleared 1 finished card.');
+  });
+});
+
+describe('KanbanBoard priority sort', () => {
+  const cardNamesIn = (column: string): string[] =>
+    within(screen.getByLabelText(column))
+      .queryAllByRole('group')
+      .map((card) => card.getAttribute('aria-label') ?? '');
+
+  it('sorts high first without touching stored order, and Reset returns to manual', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+    const manual = cardNamesIn('To Do column');
+
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    await user.selectOptions(screen.getByLabelText('Sort cards'), 'priority');
+
+    // Seed order is groceries (low), dentist (high), books (low): high first,
+    // then the low pair in filed order.
+    expect(cardNamesIn('To Do column')).toEqual([
+      'Book dentist appointment',
+      'Plan weekly groceries',
+      'Organize reading list',
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+    expect(cardNamesIn('To Do column')).toEqual(manual);
   });
 });
 

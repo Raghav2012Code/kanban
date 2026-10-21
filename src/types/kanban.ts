@@ -26,7 +26,7 @@ export interface BoardState {
 export type PriorityFilter = 'all' | Priority;
 
 /** A sort is a view over stored order; it never rewrites it. */
-export type SortMode = 'manual' | 'dueDate' | 'filedDate';
+export type SortMode = 'manual' | 'dueDate' | 'filedDate' | 'priority';
 
 export interface CardDraft {
   title: string;

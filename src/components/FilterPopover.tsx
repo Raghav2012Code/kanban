@@ -171,6 +171,7 @@ export function FilterPopover({ priority, onPriorityChange, dueWithinDays, onDue
               <option value="manual">Manual order</option>
               <option value="dueDate">Sort by due date</option>
               <option value="filedDate">Sort by filed date</option>
+              <option value="priority">Sort by priority</option>
             </Select>
           </div>
 

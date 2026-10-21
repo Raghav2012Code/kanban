@@ -55,11 +55,37 @@ describe('sortCardIds', () => {
     ]);
   });
 
+  it('orders by priority, high first', () => {
+    const state: BoardState = {
+      cards: {
+        low: { id: 'low', title: 'L', priority: 'low', createdAt: 1 },
+        medium: { id: 'medium', title: 'M', priority: 'medium', createdAt: 2 },
+        high: { id: 'high', title: 'H', priority: 'high', createdAt: 3 },
+      },
+      columns: [{ id: 'col-1', title: 'One', cardIds: ['low', 'medium', 'high'] }],
+    };
+    expect(sortCardIds(['low', 'medium', 'high'], state, 'priority')).toEqual(['high', 'medium', 'low']);
+  });
+
+  it('breaks priority ties by the existing stable rule', () => {
+    const tied: BoardState = {
+      cards: {
+        older: { id: 'older', title: 'O', priority: 'low', createdAt: 1 },
+        newer: { id: 'newer', title: 'N', priority: 'low', createdAt: 2 },
+        same: { id: 'same', title: 'S', priority: 'low', createdAt: 1 },
+      },
+      columns: [{ id: 'col-1', title: 'One', cardIds: ['newer', 'same', 'older'] }],
+    };
+    // Same priority: older filed first, then identity for equal filed times.
+    expect(sortCardIds(['newer', 'same', 'older'], tied, 'priority')).toEqual(['older', 'same', 'newer']);
+  });
+
   it('never rewrites stored order, however many times it is asked', () => {
     const state = board();
     const before = state.columns[0]?.cardIds;
     sortCardIds(before ?? [], state, 'dueDate');
     sortCardIds(before ?? [], state, 'filedDate');
+    sortCardIds(before ?? [], state, 'priority');
     expect(state.columns[0]?.cardIds).toEqual(before);
   });
 

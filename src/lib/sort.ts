@@ -16,6 +16,12 @@ import { dayNumber } from './dates';
  * renders the same way.
  */
 function compareBy(criterion: Exclude<SortMode, 'manual'>): (a: CardItem, b: CardItem) => number {
+  // Priority is a value every card has, so unlike a due-date sort there is no
+  // undated case to place: high first, then the existing tie rule.
+  if (criterion === 'priority') {
+    const rank = { high: 0, medium: 1, low: 2 } as const;
+    return (a, b) => rank[a.priority] - rank[b.priority] || tieBreak(a, b);
+  }
   // A due-date sort measures the deadline, which a card may not have; a filed-date
   // sort measures a value every card has. `null` means "no deadline", and only the
   // due-date sort can produce it.
