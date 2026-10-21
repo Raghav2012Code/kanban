@@ -122,6 +122,21 @@ export function removeCard(state: BoardState, cardId: string): BoardState {
   return { cards, columns: state.columns.map((column) => (column.cardIds.includes(cardId) ? { ...column, cardIds: column.cardIds.filter((id) => id !== cardId) } : column)) };
 }
 
+/**
+ * Removes a group of cards in a single pass, as one mutation, so one undo
+ * restores the whole batch. Unknown identifiers are ignored, survivors keep
+ * their order, and a request that removes nothing returns the same board so
+ * the history does not grow. Both the selection delete and the Done clear use
+ * it, so the two cannot diverge.
+ */
+export function removeCards(state: BoardState, cardIds: string[]): BoardState {
+  const doomed = new Set(cardIds.filter((id) => state.cards[id]));
+  if (doomed.size === 0) return state;
+  const cards = { ...state.cards };
+  for (const id of doomed) delete cards[id];
+  return { cards, columns: state.columns.map((column) => (column.cardIds.some((id) => doomed.has(id)) ? { ...column, cardIds: column.cardIds.filter((id) => !doomed.has(id)) } : column)) };
+}
+
 export function addCard(state: BoardState, columnId: string, card: CardItem): BoardState {
   if (state.cards[card.id] || !state.columns.some((column) => column.id === columnId)) return state;
   return { cards: { ...state.cards, [card.id]: card }, columns: state.columns.map((column) => (column.id === columnId ? { ...column, cardIds: [...column.cardIds, card.id] } : column)) };
@@ -178,4 +193,16 @@ export function pruneExpandedIds(expandedIds: Set<string>, removedCardId: string
   const next = new Set(expandedIds);
   next.delete(removedCardId);
   return next;
+}
+
+/** Forgets the expanded descriptions of every removed card in one pass. */
+export function pruneRemovedIds(expandedIds: Set<string>, removedIds: ReadonlySet<string>): Set<string> {
+  let next: Set<string> | null = null;
+  for (const id of removedIds) {
+    if ((next ?? expandedIds).has(id)) {
+      next ??= new Set(expandedIds);
+      next.delete(id);
+    }
+  }
+  return next ?? expandedIds;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addCard, isColumnAtLimit, isColumnOverLimit, isFilterActive, moveCard, moveCardToAdjacentColumn, moveCardWithinColumn, moveCardsInto, moveColumnToAdjacent, pruneExpandedIds, removeCard, resolveInsertAfter, updateCard } from '../board';
+import { addCard, isColumnAtLimit, isColumnOverLimit, isFilterActive, moveCard, moveCardToAdjacentColumn, moveCardWithinColumn, moveCardsInto, moveColumnToAdjacent, pruneExpandedIds, pruneRemovedIds, removeCard, removeCards, resolveInsertAfter, updateCard } from '../board';
 import type { BoardState, CardDraft, CardItem, ColumnItem } from '../../types/kanban';
 
 function board(): BoardState {
@@ -92,6 +92,38 @@ describe('removeCard', () => {
   it('is a no-op for an unknown card', () => {
     const state = board();
     expect(removeCard(state, 'missing')).toBe(state);
+  });
+});
+
+describe('removeCards', () => {
+  it('removes the whole group in one pass, leaving survivors in order', () => {
+    const removed = removeCards(board(), ['b', 'c', 'a']);
+    expect(Object.keys(removed.cards).sort()).toEqual(['d', 'e']);
+    expect(ids(removed, 'col-1')).toEqual(['e']);
+    expect(ids(removed, 'col-2')).toEqual(['d']);
+  });
+
+  it('ignores unknown identifiers', () => {
+    const removed = removeCards(board(), ['b', 'missing']);
+    expect(removed.cards.b).toBeUndefined();
+    expect(ids(removed, 'col-1')).toEqual(['a', 'e']);
+  });
+
+  it('returns the same board when nothing is removed, so history does not grow', () => {
+    const state = board();
+    expect(removeCards(state, [])).toBe(state);
+    expect(removeCards(state, ['missing'])).toBe(state);
+  });
+});
+
+describe('pruneRemovedIds', () => {
+  it('forgets every removed expansion in one pass', () => {
+    expect(pruneRemovedIds(new Set(['a', 'b', 'c']), new Set(['a', 'c']))).toEqual(new Set(['b']));
+  });
+
+  it('returns the same set when nothing was expanded', () => {
+    const expanded = new Set(['a']);
+    expect(pruneRemovedIds(expanded, new Set(['b']))).toBe(expanded);
   });
 });
 

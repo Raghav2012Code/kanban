@@ -13,7 +13,8 @@ import { TopBar } from './components/TopBar';
 import { useKanbanBoard } from './hooks/useKanbanBoard';
 import { useMotionTransition } from './hooks/useMotionTransition';
 import { computeAnalytics } from './lib/analytics';
-import { adjacentColumnOf, addCard as addCardToBoard, isColumnAtLimit, moveCard, moveCardsInto, moveCardToAdjacentColumn, moveCardWithinColumn, moveColumnToAdjacent, pruneExpandedIds, removeCard, resolveInsertAfter, updateCard } from './lib/board';
+import { adjacentColumnOf, addCard as addCardToBoard, isColumnAtLimit, moveCard, moveCardsInto, moveCardToAdjacentColumn, moveCardWithinColumn, moveColumnToAdjacent, pruneRemovedIds, removeCard, removeCards, resolveInsertAfter, updateCard } from './lib/board';
+import { getDoneColumn } from './lib/done';
 import { isViewActive, visibleByColumn as computeVisibleByColumn } from './lib/filter';
 import type { FilterCriteria } from './lib/filter';
 import { sortCardIds } from './lib/sort';
@@ -24,6 +25,16 @@ import type { BoardState, CardDraft, CardItem, ColumnItem, DropTarget, PriorityF
 
 /** At most one card form is open at a time: a column's file-card form, or one card's edit form. */
 type CardFormTarget = { kind: 'file'; columnId: string } | { kind: 'edit'; cardId: string };
+
+/**
+ * The board's one notice. A plain message announces an outcome; a deletion
+ * additionally carries the board snapshot it produced, so the Undo control is
+ * shown only while the board is still exactly that snapshot.
+ */
+interface BoardNotice {
+  message: string;
+  snapshot?: BoardState;
+}
 
 /** Half of the sticky band, in pixels, around a tile's midpoint while aiming a drop. */
 const INSERT_BAND = 6;
@@ -62,7 +73,7 @@ export default function KanbanBoard(): JSX.Element {
   const [renameValue, setRenameValue] = useState('');
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
-  const [columnNotice, setColumnNotice] = useState<string | null>(null);
+  const [columnNotice, setColumnNotice] = useState<BoardNotice | null>(null);
   const editingCardId = cardForm?.kind === 'edit' ? cardForm.cardId : null;
   const newColumnRef = useRef<HTMLInputElement>(null);
   const transition = useMotionTransition();
@@ -125,21 +136,71 @@ export default function KanbanBoard(): JSX.Element {
     setRenameValue('');
   };
   const deleteCard = (cardId: string) => {
-    updateBoard((current) => removeCard(current, cardId));
-    setExpandedIds((current) => pruneExpandedIds(current, cardId));
-    setDropTarget((current) => (current?.cardId === cardId ? { columnId: current.columnId } : current));
-    setDraggedCardId((current) => (current === cardId ? null : current));
+    const card = board.cards[cardId];
+    if (!card) return;
+    const removed = removeCard(board, cardId);
+    if (removed === board) return;
+    updateBoard(() => removed);
+    pruneViewStateFor([cardId]);
+    setColumnNotice({ message: `Deleted ${card.title}.`, snapshot: removed });
+  };
+  // A removed card must vanish from every piece of view state that referred to
+  // it, or the board holds a selection, an expansion, or a drag for a card that
+  // no longer exists.
+  const pruneViewStateFor = (removedIds: string[]) => {
+    const doomed = new Set(removedIds);
     setSelectedIds((current) => {
-      if (!current.has(cardId)) return current;
-      const next = new Set(current);
-      next.delete(cardId);
-      return next;
+      let next: Set<string> | null = null;
+      for (const id of doomed) {
+        if ((next ?? current).has(id)) {
+          next ??= new Set(current);
+          next.delete(id);
+        }
+      }
+      return next ?? current;
     });
+    setExpandedIds((current) => pruneRemovedIds(current, doomed));
+    setDraggedCardId((current) => (current && doomed.has(current) ? null : current));
+    setDropTarget((current) => (current?.cardId && doomed.has(current.cardId) ? { columnId: current.columnId } : current));
+  };
+  // Selection is explicit intent, so no confirmation is asked for: the group
+  // leaves as one recorded mutation and one undo brings it all back.
+  const deleteSelected = () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    const removed = removeCards(board, ids);
+    if (removed === board) {
+      announce(null);
+      setSelectedIds(new Set());
+      return;
+    }
+    const names = ids.map((id) => board.cards[id]?.title).filter(Boolean);
+    const message = ids.length === 1 && names[0] ? `Deleted ${names[0]}.` : `Deleted ${ids.length} cards.`;
+    updateBoard(() => removed);
+    pruneViewStateFor(ids);
+    setColumnNotice({ message, snapshot: removed });
+  };
+  // Clearing acts on the whole column, never on the visible subset: under a
+  // filter, removing only what is shown would leave hidden cards to reappear
+  // the moment the filter is lifted.
+  const clearDoneColumn = () => {
+    const done = getDoneColumn(board);
+    if (!done || done.cardIds.length === 0) return;
+    const count = done.cardIds.length;
+    const cleared = removeCards(board, done.cardIds);
+    if (cleared === board) return;
+    const message = count === 1 ? 'Cleared 1 finished card.' : `Cleared ${count} finished cards.`;
+    updateBoard(() => cleared);
+    pruneViewStateFor(done.cardIds);
+    setColumnNotice({ message, snapshot: cleared });
   };
   // Every outcome is announced through the board's one existing notice channel, so
   // a move, a refusal, and a limit all reach assistive technology the same way and
   // the board never grows a second live region.
-  const announce = (message: string | null | undefined) => { setColumnNotice(message ?? null); };
+  const announce = (message: string | null | undefined) => { setColumnNotice(message ? { message } : null); };
+  // Undo is the existing history restore, not a second mechanism: pressing it
+  // reverts the deletion the notice claims, then closes the notice.
+  const undoDeletion = () => { undo(); setColumnNotice(null); };
   // A limit that silently refused would be worse than no limit, so the refusal is
   // explained rather than ignored. The enforcement itself lives in the transition,
   // so this only decides what the person is told.
@@ -269,7 +330,7 @@ export default function KanbanBoard(): JSX.Element {
   };
   const requestDeleteColumn = (column: ColumnItem) => {
     if (column.cardIds.length > 0) {
-      setColumnNotice(`${column.title} still has ${column.cardIds.length} card${column.cardIds.length === 1 ? '' : 's'}. Move or delete them before removing the column.`);
+      setColumnNotice({ message: `${column.title} still has ${column.cardIds.length} card${column.cardIds.length === 1 ? '' : 's'}. Move or delete them before removing the column.` });
       return;
     }
     setColumnNotice(null);
@@ -399,7 +460,10 @@ export default function KanbanBoard(): JSX.Element {
             </Button>
           ))}
         </span>
-        <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} aria-label="Clear selection" className="ml-auto font-mono text-[11px] uppercase tracking-wide">
+        <Button variant="destructive" size="sm" onClick={deleteSelected} aria-label={`Delete ${selectedIds.size} selected cards`} className="ml-auto font-mono text-[11px] uppercase tracking-wide">
+          Delete
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} aria-label="Clear selection" className="font-mono text-[11px] uppercase tracking-wide">
           Clear
         </Button>
       </div>
@@ -434,7 +498,7 @@ export default function KanbanBoard(): JSX.Element {
     {selectionBar}
     <main className="mx-auto min-w-0 max-w-[1600px] px-4 py-5 sm:px-6 lg:px-10">
       <StorageNotice warning={storageWarning} onDismiss={dismissStorageWarning} />
-      {columnNotice && <div role="status" aria-live="polite" className="rise-in mb-4 flex items-center justify-between gap-3 rounded-ui border border-line bg-surface px-3 py-2 text-xs text-muted shadow-sm"><span className="min-w-0 flex-1 leading-5">{columnNotice}</span><Button variant="ghost" size="icon" onClick={() => setColumnNotice(null)} aria-label="Dismiss column notice" className="h-6 w-6"><IconX size={13} stroke={1.5} /></Button></div>}
+      {columnNotice && (!columnNotice.snapshot || columnNotice.snapshot === board) && <div role="status" aria-live="polite" className="rise-in mb-4 flex items-center justify-between gap-3 rounded-ui border border-line bg-surface px-3 py-2 text-xs text-muted shadow-sm"><span className="min-w-0 flex-1 leading-5">{columnNotice.message}</span>{columnNotice.snapshot && <Button variant="ghost" size="sm" onClick={undoDeletion} aria-label="Undo deletion" className="shrink-0 font-mono text-[11px] uppercase tracking-wide">Undo</Button>}<Button variant="ghost" size="icon" onClick={() => setColumnNotice(null)} aria-label="Dismiss column notice" className="h-6 w-6"><IconX size={13} stroke={1.5} /></Button></div>}
       <motion.div layout transition={transition} className="min-w-0 overflow-x-auto" onDragLeave={handleDragLeave}>
         <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:gap-4">
           <AnimatePresence initial={false}>
@@ -458,6 +522,7 @@ export default function KanbanBoard(): JSX.Element {
               onSaveRename={saveRename}
               onCancelRename={() => setRenamingColumn(null)}
               onDeleteColumn={() => requestDeleteColumn(column)}
+              onClearDoneColumn={column.id === getDoneColumn(board)?.id && column.cardIds.length > 0 ? clearDoneColumn : undefined}
               onDeleteCard={deleteCard}
               onEditCard={beginEditCard}
               editingCardId={editingCardId}
