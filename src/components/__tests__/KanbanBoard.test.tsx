@@ -43,7 +43,63 @@ describe('KanbanBoard column counts', () => {
     const user = userEvent.setup();
     render(<KanbanBoard />);
     await user.type(screen.getByLabelText('Search cards by title or description'), 'groceries');
-    expect(within(await screen.findByLabelText('To Do column')).getByTitle('1 of 3 cards')).toBeInTheDocument();
+    expect(within(await screen.findByLabelText('To Do column')).getByTitle('1 of 3 cards, 2 hidden')).toBeInTheDocument();
+  });
+});
+
+describe('KanbanBoard honest counts', () => {
+  it('says how many cards are hidden beside the count, with the tooltip agreeing', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await user.type(screen.getByLabelText('Search cards by title or description'), 'groceries');
+
+    const todo = await screen.findByLabelText('To Do column');
+    expect(within(todo).getByText('+2 hidden')).toBeInTheDocument();
+    expect(within(todo).getByTitle('1 of 3 cards, 2 hidden')).toHaveTextContent('1');
+  });
+
+  it('shows no hidden indicator when nothing is hidden', async () => {
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+    expect(screen.queryByText(/hidden/)).not.toBeInTheDocument();
+  });
+
+  it('keeps the hidden count on a collapsed column', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await user.type(screen.getByLabelText('Search cards by title or description'), 'groceries');
+
+    const todo = await screen.findByLabelText('To Do column');
+    await user.click(within(todo).getByRole('button', { name: 'Collapse To Do column' }));
+
+    expect(within(todo).getByText('+2 hidden')).toBeInTheDocument();
+  });
+
+  it('shows a visible zero with the hidden count when a filter matches nothing', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await user.type(screen.getByLabelText('Search cards by title or description'), 'groceries');
+
+    // Done holds one card and the filter hides it: the column must not read as empty.
+    const done = await screen.findByLabelText('Done column');
+    expect(within(done).getByText('+1 hidden')).toBeInTheDocument();
+    expect(within(done).getByText('No cards match the filter.')).toBeInTheDocument();
+  });
+
+  it('keeps the fraction visible-over-limit while stating what is hidden', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+    await user.click(screen.getByRole('button', { name: 'Set Work In Progress limit for To Do' }));
+    await user.type(screen.getByLabelText('Work In Progress limit for To Do'), '2');
+    await user.keyboard('{Enter}');
+
+    await user.type(screen.getByLabelText('Search cards by title or description'), 'groceries');
+
+    const todo = screen.getByLabelText('To Do column');
+    expect(within(todo).getByTitle('1 of 3 cards, limit 2, 2 hidden')).toHaveTextContent('1/2');
+    expect(within(todo).getByText('+2 hidden')).toBeInTheDocument();
+    expect(within(todo).queryByText('Over')).not.toBeInTheDocument();
   });
 });
 
@@ -391,7 +447,7 @@ describe('KanbanBoard Work In Progress limits', () => {
     await screen.findByLabelText('To Do column');
 
     await setLimit(user, 'To Do', '5');
-    expect(within(screen.getByLabelText('To Do column')).getByTitle('3 of 3 cards')).toHaveTextContent('3/5');
+    expect(within(screen.getByLabelText('To Do column')).getByTitle('3 of 3 cards, limit 5')).toHaveTextContent('3/5');
 
     await setLimit(user, 'To Do', '');
     expect(within(screen.getByLabelText('To Do column')).getByTitle('3 of 3 cards')).toHaveTextContent('3');
@@ -433,7 +489,7 @@ describe('KanbanBoard Work In Progress limits', () => {
     // Visible count over limit, not total membership, and the saturation marker
     // agrees with the count on screen rather than contradicting it.
     const column = screen.getByLabelText('To Do column');
-    expect(within(column).getByTitle('1 of 3 cards')).toHaveTextContent('1/2');
+    expect(within(column).getByTitle('1 of 3 cards, limit 2, 2 hidden')).toHaveTextContent('1/2');
     expect(within(column).queryByText('Over')).not.toBeInTheDocument();
   });
 

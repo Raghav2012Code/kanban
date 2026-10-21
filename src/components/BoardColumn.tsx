@@ -91,9 +91,12 @@ export function BoardColumn({ column, cards, activeForm, renaming, renameValue, 
   // Over-limit is stated in words, never by hue alone, so the signal survives
   // greyscale and colour blindness.
   const countLabel = hasLimit ? `${cards.length}/${column.limit}` : String(cards.length);
+  // Hidden work is derived where the column renders, from stored membership and
+  // the cards the current view shows. No new props, no new predicate.
+  const hidden = total - cards.length;
   const countTitle = hasLimit
-    ? `${cards.length} of ${total} cards${overLimit ? ', over the Work In Progress limit' : ''}`
-    : `${cards.length} of ${total} cards`;
+    ? `${cards.length} of ${total} cards, limit ${column.limit}${hidden > 0 ? `, ${hidden} hidden` : ''}${overLimit ? ', over the Work In Progress limit' : ''}`
+    : `${cards.length} of ${total} cards${hidden > 0 ? `, ${hidden} hidden` : ''}`;
   return <motion.section layout variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 }, exit: { opacity: 0, scale: 0.98 } }} initial="hidden" animate="visible" exit="exit" transition={transition} className={panel} onDragOver={(event) => onDragOver(event)} onDragEnter={(event) => onDragEnter(event)} onDragLeave={onDragLeave} onDrop={(event) => onDrop(event)} aria-label={`${column.title} column`}>
     <div className="flex items-center gap-1">
       {renaming
@@ -101,7 +104,7 @@ export function BoardColumn({ column, cards, activeForm, renaming, renameValue, 
         : <Button variant="ghost" onClick={onBeginRename} className="h-7 min-w-0 justify-start px-1 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink hover:bg-transparent hover:text-accent" title="Click or press Enter to rename" aria-label={`Rename ${column.title} column`}>{column.title}</Button>}
       {settingLimit
         ? <Input ref={limitRef} type="number" min={0} value={limitValue} onChange={(event) => onLimitChange(event.target.value)} onBlur={onSaveLimit} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key === 'Enter') onSaveLimit(); if (event.key === 'Escape') onCancelLimit(); }} aria-label={`Work In Progress limit for ${column.title}`} title="Leave empty for no limit" className="h-7 w-14 shrink-0 px-1 text-center font-mono text-sm" />
-        : <><span title={countTitle} className={cn('shrink-0 font-mono text-[11px] tabular-nums', overLimit ? 'font-semibold text-hold' : 'text-faint')}>{countLabel}</span>{overLimit && <span className="shrink-0 rounded-full border border-hold px-1.5 py-px font-mono text-[10px] font-semibold uppercase tracking-wide text-hold">Over</span>}<Button variant="ghost" size="icon" onClick={onStartLimit} aria-label={`Set Work In Progress limit for ${column.title}`} title={hasLimit ? `Limit ${column.limit}` : 'No limit set'} className="h-7 w-7 text-faint hover:text-ink"><IconGauge size={14} stroke={1.5} /></Button></>}
+        : <><span title={countTitle} className={cn('shrink-0 font-mono text-[11px] tabular-nums', overLimit ? 'font-semibold text-hold' : 'text-faint')}>{countLabel}</span>{hidden > 0 && <span className="shrink-0 font-mono text-[11px] tabular-nums text-faint">+{hidden} hidden</span>}{overLimit && <span className="shrink-0 rounded-full border border-hold px-1.5 py-px font-mono text-[10px] font-semibold uppercase tracking-wide text-hold">Over</span>}<Button variant="ghost" size="icon" onClick={onStartLimit} aria-label={`Set Work In Progress limit for ${column.title}`} title={hasLimit ? `Limit ${column.limit}` : 'No limit set'} className="h-7 w-7 text-faint hover:text-ink"><IconGauge size={14} stroke={1.5} /></Button></>}
       {/* The Done column's clear control names the whole column's count, never the */}
       {/* visible subset, so clearing under a filter cannot surprise. It exists only */}
       {/* while the column holds cards, so the header never offers an empty action. */}
