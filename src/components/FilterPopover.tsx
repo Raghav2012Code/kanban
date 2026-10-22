@@ -23,9 +23,16 @@ const FILED_WINDOWS: Array<{ value: number | null; label: string }> = [
  * A native popover is used: the panel lives in the top layer, and Escape and an
  * outside click close it without this component listening for either. The
  * position is set from script rather than CSS anchor positioning so the panel
- * behaves the same in every current browser.
+ * behaves the same in every current browser. Where the API is missing the
+ * trigger stays collapsed rather than throwing, so the board remains usable.
  */
-type PopoverPanel = HTMLElement & { showPopover: () => void; hidePopover: () => void };
+type PopoverPanel = HTMLElement & { showPopover?: () => void; hidePopover?: () => void };
+
+function asPopoverPanel(element: HTMLElement | null): PopoverPanel | null {
+  if (!element) return null;
+  const panel = element as PopoverPanel;
+  return typeof panel.showPopover === 'function' && typeof panel.hidePopover === 'function' ? panel : null;
+}
 
 interface FilterPopoverProps {
   priority: PriorityFilter;
@@ -51,8 +58,7 @@ export function FilterPopover({ priority, onPriorityChange, dueWithinDays, onDue
   const panelRef = useRef<HTMLDivElement>(null);
 
   const close = () => {
-    const panel = panelRef.current as PopoverPanel | null;
-    if (panel) panel.hidePopover();
+    asPopoverPanel(panelRef.current)?.hidePopover();
     setOpen(false);
   };
 
@@ -78,13 +84,13 @@ export function FilterPopover({ priority, onPriorityChange, dueWithinDays, onDue
   }, [open]);
 
   const toggle = () => {
-    const panel = panelRef.current as PopoverPanel | null;
-    const button = buttonRef.current;
-    if (!panel || !button) return;
     if (open) {
       close();
       return;
     }
+    const panel = asPopoverPanel(panelRef.current);
+    const button = buttonRef.current;
+    if (!panel || !button) return;
     const rect = button.getBoundingClientRect();
     const width = panel.offsetWidth || 288;
     const left = Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12));
