@@ -9,5 +9,9 @@ dist/
 .openchamber/
 dev*.log
 screenshot.png
+verify-*.png
+.playwright-mcp/
+test-results/
+playwright-report/
 
 .vitest/
