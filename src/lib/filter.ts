@@ -95,7 +95,10 @@ export function visibleCardIds(column: ColumnItem, board: BoardState, criteria: 
 }
 
 export function visibleByColumn(board: BoardState, criteria: FilterCriteria, today = localDateString()): Record<string, string[]> {
-  const result: Record<string, string[]> = {};
+  // A null-prototype map is deliberate: a column id such as "__proto__" is a
+  // legal id, and storing it on a plain object would silently replace the
+  // prototype instead of adding a key, making the column vanish from the view.
+  const result = Object.create(null) as Record<string, string[]>;
   for (const column of board.columns) result[column.id] = visibleCardIds(column, board, criteria, today);
   return result;
 }

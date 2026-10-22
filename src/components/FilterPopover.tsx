@@ -92,14 +92,23 @@ export function FilterPopover({ priority, onPriorityChange, dueWithinDays, onDue
       const rect = button.getBoundingClientRect();
       const width = panel.offsetWidth || 288;
       const left = Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12));
+      const top = rect.bottom + 8;
       panel.style.left = `${left}px`;
-      panel.style.top = `${rect.bottom + 8}px`;
+      panel.style.top = `${top}px`;
+      // The panel is taller than a short viewport. Clamping it and letting it
+      // scroll keeps its last control reachable instead of clipping it below the
+      // fold with no way to scroll to it.
+      panel.style.maxHeight = `${Math.max(160, window.innerHeight - top - 12)}px`;
+      panel.style.overflowY = 'auto';
       panel.showPopover();
       setOpen(true);
       return;
     }
     // Environments without the popover API (including the test suite) simply
     // show and hide the panel in place.
+    const rect = button.getBoundingClientRect();
+    panel.style.maxHeight = `${Math.max(160, window.innerHeight - rect.bottom - 20)}px`;
+    panel.style.overflowY = 'auto';
     setOpen(true);
   };
 

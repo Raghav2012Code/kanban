@@ -40,7 +40,7 @@ interface BoardNotice {
 const INSERT_BAND = 6;
 
 export default function KanbanBoard(): JSX.Element {
-  const { board, mutate: updateBoard, undo, redo, canUndo, canRedo, replaceBoard, storageWarning, dismissStorageWarning } = useKanbanBoard();
+  const { board, mutate: updateBoard, undo, redo, canUndo, canRedo, replaceBoard, storageWarning, dismissStorageWarning, externalUpdateCount } = useKanbanBoard();
   const [search, setSearch] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [collapsedIds, setCollapsedIds] = useState<ReadonlySet<string>>(() => loadCollapsedIds());
@@ -77,6 +77,94 @@ export default function KanbanBoard(): JSX.Element {
   const editingCardId = cardForm?.kind === 'edit' ? cardForm.cardId : null;
   const newColumnRef = useRef<HTMLInputElement>(null);
   const transition = useMotionTransition();
+
+  /**
+   * A control that unmounts — the delete button on the card it deletes, a save
+   * button inside a form — takes the focus with it unless something claims it
+   * back. Handlers park a lookup here; the effect runs once the board has
+   * rendered its replacement, so the target exists by the time it is focused.
+   * Lookups are by data attribute rather than CSS-escaped id, so an id is never
+   * interpreted as a selector.
+   */
+  const pendingFocus = useRef<(() => HTMLElement | null) | null>(null);
+  const focusTimer = useRef<number | null>(null);
+  useEffect(() => {
+    const find = pendingFocus.current;
+    if (!find) return;
+    pendingFocus.current = null;
+    // After the current key event, not during it. A button focused inside an
+    // Enter keydown still receives the rest of that key press, so the gauge
+    // button focused after saving a limit was immediately clicked and reopened
+    // the editor it had just closed.
+    if (focusTimer.current !== null) window.clearTimeout(focusTimer.current);
+    focusTimer.current = window.setTimeout(() => {
+      focusTimer.current = null;
+      find()?.focus();
+    }, 0);
+  });
+  // A queued focus must not land on a later board after this one is gone.
+  useEffect(() => () => {
+    if (focusTimer.current !== null) window.clearTimeout(focusTimer.current);
+  }, []);
+  const cardElement = (cardId: string): HTMLElement | null =>
+    Array.from(document.querySelectorAll<HTMLElement>('[data-card-id]')).find((element) => element.dataset.cardId === cardId) ?? null;
+  const columnElement = (columnId: string): HTMLElement | null =>
+    Array.from(document.querySelectorAll<HTMLElement>('[data-column-id]')).find((element) => element.dataset.columnId === columnId) ?? null;
+  const focusCard = (cardId: string | undefined) => {
+    if (!cardId) return;
+    pendingFocus.current = () => cardElement(cardId)?.querySelector<HTMLElement>('[aria-label^="Select "]') ?? null;
+  };
+  const focusFileCard = (columnId: string) => {
+    pendingFocus.current = () => {
+      const column = columnElement(columnId);
+      // A collapsed lane has no File card trigger; its header is the nearest
+      // surviving control, so focus stays in the lane instead of the body.
+      return column?.querySelector<HTMLElement>('[data-file-card]') ?? column?.querySelector<HTMLElement>('button[aria-label^="Rename "]') ?? null;
+    };
+  };
+  const focusColumnTitle = (columnId: string) => {
+    pendingFocus.current = () => columnElement(columnId)?.querySelector<HTMLElement>('button[aria-label^="Rename "]') ?? null;
+  };
+  const focusColumnLimit = (columnId: string) => {
+    pendingFocus.current = () => columnElement(columnId)?.querySelector<HTMLElement>('button[aria-label^="Set Work In Progress limit"]') ?? null;
+  };
+  const focusAddColumn = () => {
+    pendingFocus.current = () => document.querySelector<HTMLElement>('button[data-add-column], input[aria-label="New column name"]');
+  };
+
+  /**
+   * A board can change without the person touching this tab: an undo, an import,
+   * or another tab's write. Selection, expansion, and the open form all name
+   * entities by id, so an id that is gone must leave the view state too. Without
+   * this, a selected card that no longer exists still counts as "arriving" and a
+   * move is refused with a limit message about a card that is not there.
+   */
+  useEffect(() => {
+    const knownCards = new Set(Object.keys(board.cards));
+    const knownColumns = new Set(board.columns.map((column) => column.id));
+    const pruneMissingCards = (current: ReadonlySet<string>): Set<string> | null => {
+      let next: Set<string> | null = null;
+      for (const id of current) {
+        if (!knownCards.has(id)) {
+          next ??= new Set(current);
+          next.delete(id);
+        }
+      }
+      return next;
+    };
+    setSelectedIds((current) => pruneMissingCards(current) ?? current);
+    setExpandedIds((current) => pruneMissingCards(current) ?? current);
+    setCardForm((current) => current && (current.kind === 'file' ? knownColumns.has(current.columnId) : knownCards.has(current.cardId)) ? current : null);
+    setRenamingColumn((current) => current && !knownColumns.has(current) ? null : current);
+    setLimitingColumn((current) => current && !knownColumns.has(current) ? null : current);
+    setDraggedCardId((current) => current && !knownCards.has(current) ? null : current);
+    setDropTarget((current) => {
+      if (!current) return current;
+      if (!knownColumns.has(current.columnId)) return null;
+      if (current.cardId && !knownCards.has(current.cardId)) return { columnId: current.columnId };
+      return current;
+    });
+  }, [board]);
 
   // Undo is reachable by keyboard, but never by hijacking the browser's own text
   // undo: inside a field, Ctrl+Z means "undo my typing", which is what the person
@@ -128,21 +216,48 @@ export default function KanbanBoard(): JSX.Element {
     setNewColumnTitle('');
     setAddingColumn(false);
   };
-  const saveRename = () => {
+  const saveRename = (restoreFocus = false) => {
     if (!renamingColumn) return;
+    const columnId = renamingColumn;
     const title = renameValue.trim();
-    if (title) updateBoard((current) => ({ ...current, columns: current.columns.map((column) => column.id === renamingColumn ? { ...column, title } : column) }));
+    // Renaming to the same title is not a mutation: recording it would put an
+    // empty step in the history and make Undo appear to do nothing.
+    if (title) {
+      updateBoard((current) => {
+        const column = current.columns.find((item) => item.id === columnId);
+        if (!column || column.title === title) return current;
+        return { ...current, columns: current.columns.map((item) => item.id === columnId ? { ...item, title } : item) };
+      });
+    }
     setRenamingColumn(null);
     setRenameValue('');
+    // A blur belongs to a click somewhere else; restoring focus then would steal
+    // it from the control the person actually chose. Only Enter puts it back.
+    if (restoreFocus) focusColumnTitle(columnId);
+  };
+  const cancelRename = () => {
+    const columnId = renamingColumn;
+    setRenamingColumn(null);
+    setRenameValue('');
+    if (columnId) focusColumnTitle(columnId);
   };
   const deleteCard = (cardId: string) => {
     const card = board.cards[cardId];
     if (!card) return;
+    const column = board.columns.find((item) => item.cardIds.includes(cardId));
+    // Focus the next card the person can actually see, not the next stored card:
+    // under a filter the stored neighbour may be hidden, and focusing nothing is
+    // how focus used to fall to the document body.
+    const visible = column ? renderedByColumn[column.id] : [];
+    const index = visible.indexOf(cardId);
+    const neighbourId = index >= 0 ? visible[index + 1] ?? visible[index - 1] : undefined;
     const removed = removeCard(board, cardId);
     if (removed === board) return;
     updateBoard(() => removed);
     pruneViewStateFor([cardId]);
     setColumnNotice({ message: `Deleted ${card.title}.`, snapshot: removed });
+    if (neighbourId) focusCard(neighbourId);
+    else if (column) focusFileCard(column.id);
   };
   // A removed card must vanish from every piece of view state that referred to
   // it, or the board holds a selection, an expansion, or a drag for a card that
@@ -174,11 +289,17 @@ export default function KanbanBoard(): JSX.Element {
       setSelectedIds(new Set());
       return;
     }
+    // The first affected lane and a card that survives there are the anchor for
+    // focus once the selection bar and the deleted tiles are gone.
+    const affected = board.columns.find((column) => column.cardIds.some((id) => selectedIds.has(id)));
+    const survivorId = affected ? renderedByColumn[affected.id]?.find((id) => !selectedIds.has(id)) : undefined;
     const names = ids.map((id) => board.cards[id]?.title).filter(Boolean);
     const message = ids.length === 1 && names[0] ? `Deleted ${names[0]}.` : `Deleted ${ids.length} cards.`;
     updateBoard(() => removed);
     pruneViewStateFor(ids);
     setColumnNotice({ message, snapshot: removed });
+    if (survivorId) focusCard(survivorId);
+    else if (affected) focusFileCard(affected.id);
   };
   // Clearing acts on the whole column, never on the visible subset: under a
   // filter, removing only what is shown would leave hidden cards to reappear
@@ -193,11 +314,20 @@ export default function KanbanBoard(): JSX.Element {
     updateBoard(() => cleared);
     pruneViewStateFor(done.cardIds);
     setColumnNotice({ message, snapshot: cleared });
+    // The Clear button is gone with the cards; keep focus in the lane rather than
+    // dropping it to the body.
+    focusFileCard(done.id);
   };
   // Every outcome is announced through the board's one existing notice channel, so
   // a move, a refusal, and a limit all reach assistive technology the same way and
   // the board never grows a second live region.
   const announce = (message: string | null | undefined) => { setColumnNotice(message ? { message } : null); };
+  // An adopted board is a real event, but not a local one. It uses the same one
+  // notice channel so it cannot be missed, and mentions the other tab so the
+  // change is not mistaken for a glitch.
+  useEffect(() => {
+    if (externalUpdateCount > 0) announce('Board updated from another tab.');
+  }, [externalUpdateCount]);
   // Undo is the existing history restore, not a second mechanism: pressing it
   // reverts the deletion the notice claims, then closes the notice.
   const undoDeletion = () => { undo(); setColumnNotice(null); };
@@ -210,7 +340,9 @@ export default function KanbanBoard(): JSX.Element {
   // filtered-reorder rule. The whole group is refused or none of it is: a partial
   // move would leave the board holding some of what was asked for and none of the rest.
   const moveSelectedInto = (targetColumnId: string) => {
-    const ids = [...selectedIds];
+    // A selected id can outlive its card for one render after an undo or import;
+    // it is not work and must not count toward the limit or the announcement.
+    const ids = [...selectedIds].filter((id) => Object.hasOwn(board.cards, id));
     const target = board.columns.find((column) => column.id === targetColumnId);
     if (!target) return;
     const arriving = ids.filter((id) => !target.cardIds.includes(id));
@@ -230,11 +362,19 @@ export default function KanbanBoard(): JSX.Element {
     const names = arriving.map((id) => board.cards[id]?.title).filter(Boolean);
     announce(
       moved === board
-        ? `Nothing moved: ${target.title} would go over its limit.`
+        ? 'Nothing moved.'
         : `Moved ${arriving.length} card${arriving.length === 1 ? '' : 's'} to ${target.title}: ${names.join(', ')}.`,
     );
     updateBoard((current) => moveCardsInto(current, ids, targetColumnId));
     setSelectedIds(new Set());
+    focusColumnTitle(targetColumnId);
+  };
+  // Clearing the selection removes the bar's own button, so focus moves to the
+  // first card that was selected rather than to the body.
+  const clearSelection = () => {
+    const first = [...selectedIds][0];
+    setSelectedIds(new Set());
+    if (first) focusCard(first);
   };
   const addCard = (columnId: string, draft: CardDraft) => {
     const result = normalizeCardDraft(draft);
@@ -250,6 +390,9 @@ export default function KanbanBoard(): JSX.Element {
     };
     updateBoard((current) => addCardToBoard(current, columnId, card));
     setCardForm(null);
+    // The form's submit button is gone; return focus to the lane's File card
+    // trigger so the keyboard flow stays in the same column.
+    focusFileCard(columnId);
   };
   /** Where the card actually ended up, read off the resulting board rather than predicted. */
   const describeMove = (from: BoardState, to: BoardState, cardId: string, direction: MoveDirection): string | null => {
@@ -285,26 +428,48 @@ export default function KanbanBoard(): JSX.Element {
     updateBoard(() => moved);
   };
   const beginEditCard = (cardId: string) => { setCardForm({ kind: 'edit', cardId }); setAddingColumn(false); };
-  const saveEditedCard = (cardId: string, draft: CardDraft) => { updateBoard((current) => updateCard(current, cardId, draft)); setCardForm(null); };
+  const saveEditedCard = (cardId: string, draft: CardDraft) => {
+    updateBoard((current) => updateCard(current, cardId, draft));
+    setCardForm(null);
+    focusCard(cardId);
+  };
+  const cancelEditCard = () => {
+    const cardId = cardForm?.kind === 'edit' ? cardForm.cardId : null;
+    setCardForm(null);
+    if (cardId) focusCard(cardId);
+  };
   const moveColumnTo = (columnId: string, direction: 'left' | 'right') => updateBoard((current) => moveColumnToAdjacent(current, columnId, direction));
   const beginLimit = (column: ColumnItem) => { setLimitingColumn(column.id); setLimitValue(column.limit === undefined ? '' : String(column.limit)); };
   // An empty or unusable value clears the limit, so a stale number is never permanent.
   // Clearing is expressed by dropping the key rather than rebuilding the column, so a
   // field added to a column later is not silently discarded here.
-  const saveLimit = () => {
+  const saveLimit = (restoreFocus = false) => {
     if (!limitingColumn) return;
+    const columnId = limitingColumn;
     const parsed = Number(limitValue);
     const limit = Number.isInteger(parsed) && parsed >= 0 && limitValue.trim() !== '' ? parsed : undefined;
-    updateBoard((current) => ({
-      ...current,
-      columns: current.columns.map((column) => {
-        if (column.id !== limitingColumn) return column;
-        if (limit !== undefined) return { ...column, limit };
-        const { limit: _removed, ...rest } = column;
-        return rest;
-      }),
-    }));
+    // Setting the limit it already has is not a mutation, for the same reason a
+    // no-op rename is not: history must not record a step that changed nothing.
+    updateBoard((current) => {
+      const column = current.columns.find((item) => item.id === columnId);
+      if (!column || column.limit === limit) return current;
+      return {
+        ...current,
+        columns: current.columns.map((item) => {
+          if (item.id !== columnId) return item;
+          if (limit !== undefined) return { ...item, limit };
+          const { limit: _removed, ...rest } = item;
+          return rest;
+        }),
+      };
+    });
     setLimitingColumn(null);
+    if (restoreFocus) focusColumnLimit(columnId);
+  };
+  const cancelLimit = () => {
+    const columnId = limitingColumn;
+    setLimitingColumn(null);
+    if (columnId) focusColumnLimit(columnId);
   };
   // Routed through the board's one existing notice channel rather than a second
   // live region, so an import outcome is announced the same way a limit refusal
@@ -333,8 +498,14 @@ export default function KanbanBoard(): JSX.Element {
       setColumnNotice({ message: `${column.title} still has ${column.cardIds.length} card${column.cardIds.length === 1 ? '' : 's'}. Move or delete them before removing the column.` });
       return;
     }
-    setColumnNotice(null);
+    const index = board.columns.findIndex((item) => item.id === column.id);
+    const remaining = board.columns[index + 1] ?? board.columns[index - 1];
     updateBoard((current) => ({ ...current, columns: current.columns.filter((item) => item.id !== column.id) }));
+    // A column disappearing is an outcome too: without this the control vanished
+    // and the removal happened in silence.
+    setColumnNotice({ message: `Deleted ${column.title} column.` });
+    if (remaining) focusColumnTitle(remaining.id);
+    else focusAddColumn();
   };
   const clearDrag = () => { setDraggedCardId(null); updateDropTarget(null); };
   /**
@@ -403,7 +574,14 @@ export default function KanbanBoard(): JSX.Element {
         const rect = event.currentTarget.getBoundingClientRect();
         insertAfter = anchored ? Boolean(anchored.insertAfter) : resolveInsertAfter(event.clientY, rect.top, rect.height);
       }
-      const moved = moveCard(board, id, columnId, anchorId, insertAfter);
+      const moved = moveCard(board, id, columnId, anchorId, insertAfter, { positional: positionalEnabled });
+      // A drop that changes nothing (onto itself, or inside its own lane under a
+      // filter or sort) must not announce a move that never happened.
+      if (moved === board) {
+        announce(null);
+        clearDrag();
+        return;
+      }
       const landed = moved.columns.find((column) => column.cardIds.includes(id));
       const card = board.cards[id];
       announce(landed && card ? `Moved ${card.title} to ${landed.title}, position ${landed.cardIds.indexOf(id) + 1} of ${landed.cardIds.length}.` : null);
@@ -453,17 +631,17 @@ export default function KanbanBoard(): JSX.Element {
               variant="outline"
               size="sm"
               onClick={() => moveSelectedInto(column.id)}
-              aria-label={`Move ${selectedIds.size} selected cards to ${column.title}`}
+              aria-label={`Move ${selectedIds.size} selected card${selectedIds.size === 1 ? '' : 's'} to ${column.title}`}
               className="font-mono text-[11px] uppercase tracking-wide"
             >
               {column.title}
             </Button>
           ))}
         </span>
-        <Button variant="destructive" size="sm" onClick={deleteSelected} aria-label={`Delete ${selectedIds.size} selected cards`} className="ml-auto font-mono text-[11px] uppercase tracking-wide">
+        <Button variant="destructive" size="sm" onClick={deleteSelected} aria-label={`Delete ${selectedIds.size} selected card${selectedIds.size === 1 ? '' : 's'}`} className="ml-auto font-mono text-[11px] uppercase tracking-wide">
           Delete
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} aria-label="Clear selection" className="font-mono text-[11px] uppercase tracking-wide">
+        <Button variant="ghost" size="sm" onClick={clearSelection} aria-label="Clear selection" className="font-mono text-[11px] uppercase tracking-wide">
           Clear
         </Button>
       </div>
@@ -516,18 +694,18 @@ export default function KanbanBoard(): JSX.Element {
               canMoveRight={index < board.columns.length - 1}
               onStartCardForm={() => { setCardForm({ kind: 'file', columnId: column.id }); setAddingColumn(false); }}
               onSaveCard={(draft) => addCard(column.id, draft)}
-              onCancelCardForm={() => setCardForm(null)}
+              onCancelCardForm={() => { setCardForm(null); focusFileCard(column.id); }}
               onBeginRename={() => beginRename(column)}
               onRenameChange={setRenameValue}
               onSaveRename={saveRename}
-              onCancelRename={() => setRenamingColumn(null)}
+              onCancelRename={cancelRename}
               onDeleteColumn={() => requestDeleteColumn(column)}
               onClearDoneColumn={column.id === getDoneColumn(board)?.id && column.cardIds.length > 0 ? clearDoneColumn : undefined}
               onDeleteCard={deleteCard}
               onEditCard={beginEditCard}
               editingCardId={editingCardId}
               onSaveCardDraft={saveEditedCard}
-              onCancelEditCard={() => setCardForm(null)}
+              onCancelEditCard={cancelEditCard}
               onMoveColumn={(direction) => moveColumnTo(column.id, direction)}
               selectedIds={selectedIds}
               onToggleSelected={toggleSelected}
@@ -538,7 +716,7 @@ export default function KanbanBoard(): JSX.Element {
               onStartLimit={() => beginLimit(column)}
               onLimitChange={setLimitValue}
               onSaveLimit={saveLimit}
-              onCancelLimit={() => setLimitingColumn(null)}
+              onCancelLimit={cancelLimit}
               onMove={moveCardTo}
               expandedIds={expandedIds}
               onToggleExpanded={(id) => setExpandedIds((current) => {
@@ -558,6 +736,7 @@ export default function KanbanBoard(): JSX.Element {
               ? <AddColumn value={newColumnTitle} inputRef={newColumnRef} onChange={setNewColumnTitle} onSave={saveColumn} onCancel={() => { setAddingColumn(false); setNewColumnTitle(''); }} />
               : <Button
                 variant="ghost"
+                data-add-column
                 onClick={() => { setAddingColumn(true); setCardForm((current) => (current?.kind === 'file' ? null : current)); }}
                 className="h-11 w-full shrink-0 justify-start rounded-ui border border-dashed border-line-strong px-3 text-[12px] font-medium text-muted hover:border-accent hover:bg-transparent hover:text-accent lg:w-44"
               >

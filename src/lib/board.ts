@@ -38,6 +38,11 @@ export function moveCard(state: BoardState, cardId: string, targetColumnId: stri
   if (sourceColumn.id !== targetColumn.id && isColumnAtLimit(targetColumn)) return state;
 
   const positional = options.positional !== false;
+  // A positional move is the only reason to touch a card that is already in the
+  // target column. With positional movement disabled (any filter or sort is
+  // active) the view no longer matches stored order, so appending there would
+  // silently rewrite the order the person never asked to change. ADR-0002.
+  if (!positional && sourceColumn.id === targetColumn.id) return state;
   const anchorId = positional ? targetCardId : undefined;
   if (anchorId === cardId) return state;
 
@@ -75,10 +80,12 @@ export function moveCardsInto(state: BoardState, cardIds: string[], targetColumn
   const target = state.columns.find((column) => column.id === targetColumnId);
   if (!target) return state;
 
-  // Only cards that are actually moving count against the limit, and only those
-  // are moved. Re-issuing the move for a card already in the target would append
-  // it to its own column and quietly reorder work that was never asked to move.
-  const arriving = cardIds.filter((id) => !target.cardIds.includes(id));
+  // Only cards that actually exist and are actually moving count against the
+  // limit, and only those are moved. An id with no card (a stale selection) must
+  // not inflate the count or the announcement. Re-issuing the move for a card
+  // already in the target would append it to its own column and quietly reorder
+  // work that was never asked to move.
+  const arriving = cardIds.filter((id) => Object.hasOwn(state.cards, id) && !target.cardIds.includes(id));
   if (isColumnAtLimit(target, arriving.length)) return state;
 
   return arriving.reduce((current, cardId) => moveCard(current, cardId, targetColumnId), state);

@@ -815,7 +815,7 @@ describe('KanbanBoard export and import', () => {
 
     await importFile(user, exported.content);
     // Nothing has been replaced yet: importing cannot quietly destroy work.
-    expect(await screen.findByRole('status')).toHaveTextContent(/replace this board/i);
+    expect(await screen.findByRole('dialog', { name: 'Confirm board import' })).toHaveTextContent(/replace this board/i);
     expect(screen.getByRole('group', { name: 'Research personal finance apps' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Import' }));
@@ -831,11 +831,27 @@ describe('KanbanBoard export and import', () => {
     await screen.findByLabelText('Backlog column');
 
     await importFile(user, JSON.stringify(other));
-    await screen.findByRole('status');
+    await screen.findByRole('dialog', { name: 'Confirm board import' });
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(screen.getByRole('group', { name: 'Archive tax documents' })).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Something else entirely' })).not.toBeInTheDocument();
+  });
+
+  it('focuses the confirmation, closes it with Escape, and gives focus back', async () => {
+    const user = userEvent.setup();
+    const board = createSeedState(new Date(2026, 8, 25));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
+    render(<KanbanBoard />);
+    await screen.findByLabelText('Backlog column');
+
+    await importFile(user, JSON.stringify(board));
+    const dialog = await screen.findByRole('dialog', { name: 'Confirm board import' });
+    expect(within(dialog).getByRole('button', { name: 'Import' })).toHaveFocus();
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Confirm board import' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import board' })).toHaveFocus();
   });
 
   it('rejects a file that is not a board, and changes nothing', async () => {
@@ -1153,9 +1169,9 @@ describe('KanbanBoard bulk move', () => {
     await screen.findByLabelText('To Do column');
 
     await selectCards(user, ['Organize reading list']);
-    await user.click(screen.getByRole('button', { name: 'Move 1 selected cards to In Progress' }));
+    await user.click(screen.getByRole('button', { name: 'Move 1 selected card to In Progress' }));
 
-    expect(screen.queryByRole('button', { name: /selected cards/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /selected card/ })).not.toBeInTheDocument();
   });
 
   it('obeys the same Work In Progress limit as a single move', async () => {
@@ -1249,7 +1265,7 @@ describe('KanbanBoard bulk move', () => {
     await user.click(screen.getByRole('button', { name: 'Delete Plan weekly groceries' }));
 
     // Leaving a deleted card in the selection would let it be "moved" to nowhere.
-    expect(screen.queryByRole('button', { name: /selected cards/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /selected card/ })).not.toBeInTheDocument();
   });
 
   it('states selection in words as well as a checked box', async () => {
@@ -1285,7 +1301,7 @@ describe('KanbanBoard bulk delete', () => {
 
     await user.click(screen.getByRole('button', { name: 'Delete Plan weekly groceries' }));
 
-    expect(cardNamesIn('To Do column')).toEqual(['Book dentist appointment', 'Organize reading list']);
+    await waitFor(() => expect(cardNamesIn('To Do column')).toEqual(['Book dentist appointment', 'Organize reading list']));
     expect(await screen.findByRole('status')).toHaveTextContent('Deleted Plan weekly groceries.');
   });
 
@@ -1297,10 +1313,10 @@ describe('KanbanBoard bulk delete', () => {
     await selectCards(user, ['Organize reading list', 'Plan weekly groceries']);
     await user.click(screen.getByRole('button', { name: 'Delete 2 selected cards' }));
 
-    expect(cardNamesIn('To Do column')).toEqual(['Book dentist appointment']);
+    await waitFor(() => expect(cardNamesIn('To Do column')).toEqual(['Book dentist appointment']));
     expect(await screen.findByRole('status')).toHaveTextContent('Deleted 2 cards.');
     // The removed cards leave the selection with them.
-    expect(screen.queryByRole('button', { name: /selected cards/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /selected card/ })).not.toBeInTheDocument();
   });
 
   it('restores the whole batch to its columns and positions with one undo', async () => {
@@ -1311,12 +1327,12 @@ describe('KanbanBoard bulk delete', () => {
 
     await selectCards(user, ['Plan weekly groceries', 'Set up photo backup']);
     await user.click(screen.getByRole('button', { name: 'Delete 2 selected cards' }));
-    expect(cardNamesIn('Backlog column')).toEqual(['Research personal finance apps']);
+    await waitFor(() => expect(cardNamesIn('Backlog column')).toEqual(['Research personal finance apps']));
 
     await user.click(screen.getByRole('button', { name: 'Undo' }));
 
-    expect(cardNamesIn('Backlog column')).toEqual(['Research personal finance apps', 'Set up photo backup']);
-    expect(cardNamesIn('To Do column')).toEqual(todoBefore);
+    await waitFor(() => expect(cardNamesIn('Backlog column')).toEqual(['Research personal finance apps', 'Set up photo backup']));
+    await waitFor(() => expect(cardNamesIn('To Do column')).toEqual(todoBefore));
   });
 
   it('offers a Done clear control only while the column holds cards', async () => {
@@ -1326,7 +1342,7 @@ describe('KanbanBoard bulk delete', () => {
 
     await user.click(screen.getByRole('button', { name: 'Clear 1 finished card from Done' }));
 
-    expect(cardNamesIn('Done column')).toEqual([]);
+    await waitFor(() => expect(cardNamesIn('Done column')).toEqual([]));
     expect(await screen.findByRole('status')).toHaveTextContent('Cleared 1 finished card.');
     expect(screen.queryByRole('button', { name: /Clear \d+ finished card/ })).not.toBeInTheDocument();
   });
@@ -1362,15 +1378,15 @@ describe('KanbanBoard deletion undo', () => {
 
     await user.click(screen.getByRole('button', { name: 'Delete Plan weekly groceries' }));
     expect(await screen.findByRole('status')).toHaveTextContent('Deleted Plan weekly groceries.');
-    expect(cardNamesIn('To Do column')).toEqual(['Book dentist appointment', 'Organize reading list']);
+    await waitFor(() => expect(cardNamesIn('To Do column')).toEqual(['Book dentist appointment', 'Organize reading list']));
 
     await user.click(screen.getByRole('button', { name: 'Undo deletion' }));
 
-    expect(cardNamesIn('To Do column')).toEqual([
+    await waitFor(() => expect(cardNamesIn('To Do column')).toEqual([
       'Plan weekly groceries',
       'Book dentist appointment',
       'Organize reading list',
-    ]);
+    ]));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
@@ -1384,7 +1400,7 @@ describe('KanbanBoard deletion undo', () => {
 
     await user.click(screen.getByRole('button', { name: 'Undo deletion' }));
 
-    expect(cardNamesIn('Done column')).toEqual(['Archive tax documents']);
+    await waitFor(() => expect(cardNamesIn('Done column')).toEqual(['Archive tax documents']));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
@@ -1485,5 +1501,161 @@ describe('KanbanBoard column ordering', () => {
     await user.click(screen.getByRole('button', { name: 'Move To Do column right' }));
 
     expect(columnOrder()).toEqual(['Backlog column', 'In Progress column', 'To Do column', 'Done column']);
+  });
+});
+
+describe('KanbanBoard focus after an action removes its control', () => {
+  it('moves focus to the next card in the lane after a deletion', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('To Do column');
+
+    await user.click(screen.getByRole('button', { name: 'Delete Plan weekly groceries' }));
+
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Select Book dentist appointment' })).toHaveFocus());
+  });
+
+  it('returns focus to the lane file trigger after saving a filed card', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    const toDo = await screen.findByLabelText('To Do column');
+
+    await user.click(within(toDo).getByRole('button', { name: 'File card' }));
+    const form = await screen.findByRole('form', { name: 'File card' });
+    await user.type(within(form).getByLabelText('Card title'), 'A fresh card');
+    await user.click(within(form).getByRole('button', { name: 'Save card' }));
+
+    expect(await screen.findByRole('group', { name: 'A fresh card' })).toBeInTheDocument();
+    await waitFor(() => expect(within(toDo).getByRole('button', { name: 'File card' })).toHaveFocus());
+  });
+
+  it('returns focus to the title after renaming with Enter', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    const title = await screen.findByRole('button', { name: 'Rename Backlog column' });
+
+    await user.click(title);
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Rename Backlog column' })).toHaveFocus());
+  });
+
+  it('returns focus to the gauge after setting a limit with Enter', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    const title = await screen.findByLabelText('Backlog column');
+
+    await user.click(within(title).getByRole('button', { name: 'Set Work In Progress limit for Backlog' }));
+    await user.type(screen.getByLabelText('Work In Progress limit for Backlog'), '2');
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(within(title).getByRole('button', { name: 'Set Work In Progress limit for Backlog' })).toHaveFocus());
+  });
+});
+
+describe('KanbanBoard no-op edits', () => {
+  it('does not record a rename that leaves the title unchanged', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    await screen.findByLabelText('Backlog column');
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Rename Backlog column' }));
+    await user.keyboard('{Enter}');
+
+    // Nothing changed, so there is no empty step for Undo to walk back.
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Rename Backlog column' })).toBeInTheDocument();
+  });
+
+  it('does not record a limit that is already set', async () => {
+    const user = userEvent.setup();
+    const board = createSeedState(new Date(2026, 8, 25));
+    const backlog = board.columns[0];
+    if (!backlog) throw new Error('seed has no columns');
+    backlog.limit = 2;
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
+    render(<KanbanBoard />);
+    await screen.findByLabelText('Backlog column');
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Set Work In Progress limit for Backlog' }));
+    await user.keyboard('{Enter}');
+
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    expect(screen.getByTitle('2 of 2 cards, limit 2')).toBeInTheDocument();
+  });
+});
+
+describe('KanbanBoard empty column deletion', () => {
+  it('announces the removal and keeps focus on the board', async () => {
+    const user = userEvent.setup();
+    const board = createSeedState(new Date(2026, 8, 25));
+    board.columns.push({ id: 'column-empty', title: 'Archive', cardIds: [] });
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
+    render(<KanbanBoard />);
+    const empty = await screen.findByLabelText('Archive column');
+
+    await user.click(within(empty).getByRole('button', { name: 'Delete Archive column' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Deleted Archive column.');
+    await waitFor(() => expect(screen.queryByLabelText('Archive column')).not.toBeInTheDocument());
+    // The previous lane is the nearest remaining context.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Rename Done column' })).toHaveFocus());
+  });
+});
+
+describe('KanbanBoard collapsed lane semantics', () => {
+  it('hides the body with a display class, because .flex overrides the hidden attribute', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    const toDo = await screen.findByLabelText('To Do column');
+
+    await user.click(within(toDo).getByRole('button', { name: 'Collapse To Do column' }));
+
+    const body = document.getElementById('column-todo-body');
+    expect(body).toHaveClass('hidden');
+    expect(body).not.toHaveClass('flex');
+
+    await user.click(within(toDo).getByRole('button', { name: 'Expand To Do column' }));
+    expect(body).not.toHaveClass('hidden');
+    expect(body).toHaveClass('flex');
+  });
+
+  it('gives each lane a heading level, so card titles never skip from the page h1', async () => {
+    render(<KanbanBoard />);
+    await screen.findByLabelText('Backlog column');
+    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(4);
+  });
+
+  it('says nothing when a card is dropped onto itself', async () => {
+    render(<KanbanBoard />);
+    const card = await screen.findByRole('group', { name: 'Prepare laundry schedule' });
+
+    fireEvent.dragStart(card, { dataTransfer: makeDataTransfer('card-laundry') });
+    fireEvent.drop(card, { dataTransfer: makeDataTransfer('card-laundry') });
+
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+  });
+
+  it('does not rewrite stored order when a filtered view drops a card in its own lane', async () => {
+    const user = userEvent.setup();
+    render(<KanbanBoard />);
+    const search = await screen.findByLabelText('Search cards by title or description');
+    await user.type(search, 'groceries');
+
+    const toDo = screen.getByLabelText('To Do column');
+    const card = screen.getByRole('group', { name: 'Plan weekly groceries' });
+    fireEvent.dragStart(card, { dataTransfer: makeDataTransfer('card-groceries') });
+    fireEvent.drop(toDo, { dataTransfer: makeDataTransfer('card-groceries') });
+
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+
+    await user.clear(search);
+    expect(within(screen.getByLabelText('To Do column')).queryAllByRole('group').map((entry) => entry.getAttribute('aria-label'))).toEqual([
+      'Plan weekly groceries',
+      'Book dentist appointment',
+      'Organize reading list',
+    ]);
   });
 });

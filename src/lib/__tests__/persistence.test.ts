@@ -129,6 +129,21 @@ describe('loadBoardState', () => {
       expect(isValidBoard(JSON.parse(JSON.stringify(board))), `limit ${JSON.stringify(limit)}`).toBe(false);
     }
   });
+
+  it('rejects a card reference that only resolves through Object.prototype', () => {
+    // "constructor" is a legal id in principle, but not this one: no card is
+    // stored under it, so the column points at a function. Accepting it used to
+    // let a hand-edited file reach the renderer and crash on the missing card.
+    const board = { cards: {}, columns: [{ id: 'col', title: 'Col', cardIds: ['constructor'] }] };
+    expect(isValidBoard(board)).toBe(false);
+  });
+
+  it('accepts a card that is genuinely stored under a prototype-looking key', () => {
+    // The own-property check must not reject a real card just because its id
+    // matches a name every object inherits.
+    const board = JSON.parse('{"cards":{"constructor":{"id":"constructor","title":"Own","priority":"low","createdAt":1}},"columns":[{"id":"col","title":"Col","cardIds":["constructor"]}]}');
+    expect(isValidBoard(board)).toBe(true);
+  });
 });
 
 describe('persistBoardState', () => {

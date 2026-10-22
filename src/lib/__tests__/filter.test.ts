@@ -134,6 +134,19 @@ describe('visibleByColumn', () => {
     const visible = visibleByColumn(board(), criteria({ overdueOnly: true }), TODAY);
     expect(visible['column-done']).toEqual([]);
   });
+
+  it('keeps a column whose id collides with Object.prototype', () => {
+    // A column id is any non-empty string, so "__proto__" is legal. On a plain
+    // object the assignment would replace the prototype and the column would
+    // vanish from every consumer that enumerates the result.
+    const state: BoardState = {
+      cards: { a: { id: 'a', title: 'A', priority: 'low', createdAt: 1 } },
+      columns: [{ id: '__proto__', title: 'Proto', cardIds: ['a'] }],
+    };
+    const visible = visibleByColumn(state, criteria(), TODAY);
+    expect(Object.hasOwn(visible, '__proto__')).toBe(true);
+    expect(visible['__proto__']).toEqual(['a']);
+  });
 });
 
 describe('isViewActive', () => {

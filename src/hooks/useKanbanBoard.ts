@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createLocalBoardStore } from '../lib/board-store';
+import { STORAGE_KEY } from '../lib/constants';
 import { isValidBoard } from '../lib/persistence';
 import type { BoardState } from '../types/kanban';
 
@@ -30,6 +31,8 @@ export interface UseKanbanBoardResult {
   replaceBoard: (updater: (current: BoardState) => BoardState) => void;
   storageWarning: StorageWarning | null;
   dismissStorageWarning: () => void;
+  /** Increments when another tab's write is adopted, so the board can say so. */
+  externalUpdateCount: number;
 }
 
 export function useKanbanBoard(): UseKanbanBoardResult {
@@ -45,12 +48,56 @@ export function useKanbanBoard(): UseKanbanBoardResult {
     if (initial.status === 'unavailable') return { kind: 'unavailable' };
     return null;
   });
+  const [externalUpdateCount, setExternalUpdateCount] = useState(0);
   const dismissedKinds = useRef<Set<StorageWarning['kind']>>(new Set());
+  // The storage listener is installed once and must compare an event against the
+  // current board without resubscribing on every edit, so the latest board lives
+  // in a ref as well as in state.
+  const latestBoard = useRef(state.board);
+  useEffect(() => { latestBoard.current = state.board; }, [state.board]);
 
   useEffect(() => {
     const result = store.write(state.board);
-    if (!result.ok && !dismissedKinds.current.has(result.reason)) setStorageWarning({ kind: result.reason });
+    if (result.ok) {
+      // A successful write proves a write failure is over. Corrupt and
+      // unavailable warnings describe the read, so a successful write must not
+      // erase them. A dismissed quota warning is armed again once writing works,
+      // otherwise one dismissal would silence every later failure.
+      dismissedKinds.current.delete('quota');
+      dismissedKinds.current.delete('unknown');
+      setStorageWarning((current) => (current?.kind === 'quota' || current?.kind === 'unknown' ? null : current));
+      return;
+    }
+    if (!dismissedKinds.current.has(result.reason)) setStorageWarning({ kind: result.reason });
   }, [state.board, store]);
+
+  // Two tabs on the same key are the normal case for a local-first board, not an
+  // edge case: without this listener each tab keeps its own copy and the last
+  // writer silently overwrites the other's work. A tab adopts another tab's board
+  // as soon as it is written, so the next local edit is based on what is actually
+  // stored. History is cleared because Undo in this tab must not revert work done
+  // in another. Simultaneous writes still resolve last-writer-wins; true merging
+  // belongs to the shared-board work.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEY || event.newValue === null) return;
+      let incoming: unknown;
+      try {
+        incoming = JSON.parse(event.newValue);
+      } catch {
+        return;
+      }
+      if (!isValidBoard(incoming)) return;
+      // Storage events fire only in other tabs, but an echo of this tab's own
+      // value can still arrive. Adopting an identical board would clear history
+      // and announce an update that did not happen.
+      if (JSON.stringify(latestBoard.current) === event.newValue) return;
+      setState({ board: incoming, past: [], future: [] });
+      setExternalUpdateCount((count) => count + 1);
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const mutate = useCallback((updater: (current: BoardState) => BoardState) => {
     setState((current) => {
@@ -108,5 +155,6 @@ export function useKanbanBoard(): UseKanbanBoardResult {
     replaceBoard: mutate,
     storageWarning,
     dismissStorageWarning,
+    externalUpdateCount,
   };
 }
