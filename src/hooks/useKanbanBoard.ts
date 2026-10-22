@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createLocalBoardStore } from '../lib/board-store';
 import { STORAGE_KEY } from '../lib/constants';
-import { isValidBoard } from '../lib/persistence';
+import { isValidBoard, loadBoardState, persistBoardState } from '../lib/persistence';
 import type { BoardState } from '../types/kanban';
 
 /** Bounded so memory cannot grow without limit. */
@@ -36,10 +35,7 @@ export interface UseKanbanBoardResult {
 }
 
 export function useKanbanBoard(): UseKanbanBoardResult {
-  // Everything the board touches goes through the store, so nothing above this hook
-  // knows whether the board is local or shared.
-  const [store] = useState(createLocalBoardStore);
-  const [initial] = useState(() => store.read());
+  const [initial] = useState(() => loadBoardState());
   // One object rather than three states, so a mutation and its history entry are
   // applied atomically and cannot be recorded twice or half-written.
   const [state, setState] = useState<BoardHistory>(() => ({ board: initial.board, past: [], future: [] }));
@@ -57,7 +53,7 @@ export function useKanbanBoard(): UseKanbanBoardResult {
   useEffect(() => { latestBoard.current = state.board; }, [state.board]);
 
   useEffect(() => {
-    const result = store.write(state.board);
+    const result = persistBoardState(state.board);
     if (result.ok) {
       // A successful write proves a write failure is over. Corrupt and
       // unavailable warnings describe the read, so a successful write must not
@@ -69,7 +65,7 @@ export function useKanbanBoard(): UseKanbanBoardResult {
       return;
     }
     if (!dismissedKinds.current.has(result.reason)) setStorageWarning({ kind: result.reason });
-  }, [state.board, store]);
+  }, [state.board]);
 
   // Two tabs on the same key are the normal case for a local-first board, not an
   // edge case: without this listener each tab keeps its own copy and the last

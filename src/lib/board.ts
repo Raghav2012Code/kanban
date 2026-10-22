@@ -1,4 +1,4 @@
-import type { BoardState, CardDraft, CardItem, ColumnItem, PriorityFilter } from '../types/kanban';
+import type { BoardState, CardDraft, CardItem, ColumnItem } from '../types/kanban';
 
 export interface MoveCardOptions {
   positional?: boolean;
@@ -191,25 +191,14 @@ export function resolveInsertAfter(clientY: number, top: number, height: number)
   return clientY >= top + height / 2;
 }
 
-export function isFilterActive(query: string, priority: PriorityFilter): boolean {
-  return query.trim().length > 0 || priority !== 'all';
-}
-
-export function pruneExpandedIds(expandedIds: Set<string>, removedCardId: string): Set<string> {
-  if (!expandedIds.has(removedCardId)) return expandedIds;
-  const next = new Set(expandedIds);
-  next.delete(removedCardId);
-  return next;
-}
-
-/** Forgets the expanded descriptions of every removed card in one pass. */
-export function pruneRemovedIds(expandedIds: Set<string>, removedIds: ReadonlySet<string>): Set<string> {
+/** Forgets every removed id from a set in one pass. */
+export function pruneRemovedIds<T extends ReadonlySet<string>>(ids: T, removedIds: ReadonlySet<string>): T {
   let next: Set<string> | null = null;
   for (const id of removedIds) {
-    if ((next ?? expandedIds).has(id)) {
-      next ??= new Set(expandedIds);
+    if ((next ?? ids).has(id)) {
+      next ??= new Set(ids);
       next.delete(id);
     }
   }
-  return next ?? expandedIds;
+  return (next ?? ids) as T;
 }

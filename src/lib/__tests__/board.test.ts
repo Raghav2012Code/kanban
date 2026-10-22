@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addCard, isColumnAtLimit, isColumnOverLimit, isFilterActive, moveCard, moveCardToAdjacentColumn, moveCardWithinColumn, moveCardsInto, moveColumnToAdjacent, pruneExpandedIds, pruneRemovedIds, removeCard, removeCards, resolveInsertAfter, updateCard } from '../board';
+import { addCard, isColumnAtLimit, isColumnOverLimit, moveCard, moveCardToAdjacentColumn, moveCardWithinColumn, moveCardsInto, moveColumnToAdjacent, pruneRemovedIds, removeCard, removeCards, resolveInsertAfter, updateCard } from '../board';
 import type { BoardState, CardDraft, CardItem, ColumnItem } from '../../types/kanban';
 
 function board(): BoardState {
@@ -236,15 +236,6 @@ describe('moveColumnToAdjacent', () => {
   });
 });
 
-describe('isFilterActive', () => {
-  it('treats a blank query and the all filter as inactive', () => {
-    expect(isFilterActive('', 'all')).toBe(false);
-    expect(isFilterActive('   ', 'all')).toBe(false);
-    expect(isFilterActive('tax', 'all')).toBe(true);
-    expect(isFilterActive('', 'high')).toBe(true);
-  });
-});
-
 describe('moveCardsInto', () => {
   // A dedicated fixture, because a column cannot be added to the shared one without
   // putting a card in two columns at once, which is not a board the board would load.
@@ -377,14 +368,5 @@ describe('Work In Progress limits', () => {
     const state = board();
     state.columns.push(limited(1, ['e']));
     expect(ids(moveCardToAdjacentColumn(state, 'a', 'right'), 'col-3')).toEqual(['e']);
-  });
-});
-
-describe('pruneExpandedIds', () => {
-  it('drops the removed card and preserves the original set otherwise', () => {
-    const expanded = new Set(['a', 'b']);
-    const pruned = pruneExpandedIds(expanded, 'a');
-    expect([...pruned]).toEqual(['b']);
-    expect(pruneExpandedIds(expanded, 'missing')).toBe(expanded);
   });
 });

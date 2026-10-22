@@ -50,4 +50,31 @@ if (typeof window !== 'undefined') {
 
   window.ResizeObserver ??= ResizeObserverStub as unknown as typeof window.ResizeObserver;
   window.scrollTo = (() => undefined) as typeof window.scrollTo;
+
+  // jsdom has no popover API and hides [popover] by UA style. The component uses
+  // the native one, so the test suite keeps the panel queryable and gets the
+  // smallest stand-in that still fires the toggle event the component listens to.
+  const popoverStyle = document.createElement('style');
+  popoverStyle.textContent = '[popover] { display: block !important; }';
+  document.head.appendChild(popoverStyle);
+
+  if (!('showPopover' in HTMLElement.prototype)) {
+    const toggle = (panel: HTMLElement, newState: 'open' | 'closed'): void => {
+      const event = new Event('toggle');
+      Object.defineProperty(event, 'newState', { value: newState });
+      panel.dispatchEvent(event);
+    };
+    Object.defineProperties(HTMLElement.prototype, {
+      showPopover: {
+        value(this: HTMLElement): void {
+          toggle(this, 'open');
+        },
+      },
+      hidePopover: {
+        value(this: HTMLElement): void {
+          toggle(this, 'closed');
+        },
+      },
+    });
+  }
 }

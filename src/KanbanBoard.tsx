@@ -264,16 +264,7 @@ export default function KanbanBoard(): JSX.Element {
   // no longer exists.
   const pruneViewStateFor = (removedIds: string[]) => {
     const doomed = new Set(removedIds);
-    setSelectedIds((current) => {
-      let next: Set<string> | null = null;
-      for (const id of doomed) {
-        if ((next ?? current).has(id)) {
-          next ??= new Set(current);
-          next.delete(id);
-        }
-      }
-      return next ?? current;
-    });
+    setSelectedIds((current) => pruneRemovedIds(current, doomed));
     setExpandedIds((current) => pruneRemovedIds(current, doomed));
     setDraggedCardId((current) => (current && doomed.has(current) ? null : current));
     setDropTarget((current) => (current?.cardId && doomed.has(current.cardId) ? { columnId: current.columnId } : current));

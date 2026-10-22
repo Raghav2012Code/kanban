@@ -7,7 +7,7 @@ import type { BoardState } from '../types/kanban';
  * weaker one. A second validation path is a second set of rules, and the two drift.
  */
 
-export function serialiseBoard(board: BoardState): string {
+function serialiseBoard(board: BoardState): string {
   // Readable text, not minified: the point of an export is that a person can open
   // it, read it, and hand-edit it.
   return `${JSON.stringify(board, null, 2)}\n`;

@@ -14,9 +14,3 @@ export function doneCardIds(board: BoardState): string[] {
   if (!column) return [];
   return column.cardIds.filter((id) => Boolean(board.cards[id]));
 }
-
-export function isDoneCard(board: BoardState, cardId: string): boolean {
-  const column = getDoneColumn(board);
-  if (!column) return false;
-  return column.cardIds.includes(cardId);
-}

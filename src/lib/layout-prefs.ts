@@ -1,4 +1,5 @@
 import { COLLAPSED_COLUMNS_KEY, LEGACY_COLLAPSED_COLUMNS_KEY } from './constants';
+import { getStorage } from './persistence';
 
 /**
  * Which columns are collapsed is a presentation preference, so it is stored apart
@@ -27,13 +28,5 @@ export function saveCollapsedIds(ids: ReadonlySet<string>, storage: Storage | nu
     storage.setItem(COLLAPSED_COLUMNS_KEY, JSON.stringify([...ids]));
   } catch {
     return;
-  }
-}
-
-function getStorage(): Storage | null {
-  try {
-    return typeof window === 'undefined' ? null : (window.localStorage ?? null);
-  } catch {
-    return null;
   }
 }
