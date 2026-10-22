@@ -53,7 +53,9 @@ if (typeof window !== 'undefined') {
 
   // jsdom has no popover API and hides [popover] by UA style. The component uses
   // the native one, so the test suite keeps the panel queryable and gets the
-  // smallest stand-in that still fires the toggle event the component listens to.
+  // smallest stand-in that still fires the toggle event the component listens
+  // to. The stand-in is reconfigurable so a test can remove the API and prove
+  // the trigger fails closed instead of throwing.
   const popoverStyle = document.createElement('style');
   popoverStyle.textContent = '[popover] { display: block !important; }';
   document.head.appendChild(popoverStyle);
@@ -66,11 +68,15 @@ if (typeof window !== 'undefined') {
     };
     Object.defineProperties(HTMLElement.prototype, {
       showPopover: {
+        configurable: true,
+        writable: true,
         value(this: HTMLElement): void {
           toggle(this, 'open');
         },
       },
       hidePopover: {
+        configurable: true,
+        writable: true,
         value(this: HTMLElement): void {
           toggle(this, 'closed');
         },

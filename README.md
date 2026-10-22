@@ -26,7 +26,11 @@ A test suite keeps the palette, the border ladder, and those documented figures 
 
 ## Environment
 
-A change to `tailwind.config.ts` does not reliably rebuild the dev server. Restart `npm run dev` after editing it, or a correct change can appear not to have applied.
+A change to `tailwind.config.js` does not reliably rebuild the dev server. Restart `npm run dev` after editing it, or a correct change can appear not to have applied.
+
+## Browser baseline
+
+Current evergreen browsers. The Filters panel uses the native Popover API; where it is missing the trigger stays collapsed rather than throwing, so the board remains usable but the panel cannot open. Generated ids prefer `crypto.randomUUID()` and fall back to `crypto.getRandomValues()`, so filing cards and adding columns work over plain HTTP as well as localhost.
 
 ## Planning
 

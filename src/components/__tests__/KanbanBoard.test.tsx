@@ -620,6 +620,24 @@ describe('KanbanBoard filtering and sorting', () => {
     expect(screen.getByLabelText('Filter by due window')).toHaveValue('');
   });
 
+  it('leaves the Filters trigger collapsed instead of throwing when the popover API is missing', async () => {
+    const user = userEvent.setup();
+    const prototype = HTMLElement.prototype as unknown as Record<string, unknown>;
+    const { showPopover, hidePopover } = prototype;
+    Object.defineProperty(HTMLElement.prototype, 'showPopover', { value: undefined, configurable: true, writable: true });
+    Object.defineProperty(HTMLElement.prototype, 'hidePopover', { value: undefined, configurable: true, writable: true });
+    try {
+      render(<KanbanBoard />);
+      await screen.findByLabelText('Backlog column');
+
+      await user.click(screen.getByRole('button', { name: 'Filters' }));
+      expect(screen.getByRole('button', { name: 'Filters' })).toHaveAttribute('aria-expanded', 'false');
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, 'showPopover', { value: showPopover, configurable: true, writable: true });
+      Object.defineProperty(HTMLElement.prototype, 'hidePopover', { value: hidePopover, configurable: true, writable: true });
+    }
+  });
+
   it('filters to cards due inside the chosen window', async () => {
     const user = userEvent.setup();
     // Dates are relative to the real today, because the window is measured from it.

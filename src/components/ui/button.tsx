@@ -1,12 +1,12 @@
 import { forwardRef, type ButtonHTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
 
-const base = 'inline-flex items-center justify-center gap-1.5 rounded-ui font-body text-sm font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40';
+const base = 'inline-flex items-center justify-center gap-1.5 rounded-ui font-body text-sm font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40';
 
 const variants = {
-  default: 'bg-accent text-accent-fg shadow-sm hover:bg-accent-strong',
+  default: 'bg-accent text-accent-fg shadow-xs hover:bg-accent-strong',
   ghost: 'text-muted hover:bg-raised hover:text-ink',
-  outline: 'border border-line-control bg-surface text-ink shadow-sm hover:border-accent hover:text-accent',
+  outline: 'border border-line-control bg-surface text-ink shadow-xs hover:border-accent hover:text-accent',
   destructive: 'text-muted hover:bg-raised hover:text-hold',
 } as const;
 
