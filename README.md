@@ -26,7 +26,7 @@ A test suite keeps the palette, the border ladder, and those documented figures 
 
 ## Environment
 
-A change to `tailwind.config.ts` does not reliably rebuild the dev server. Restart `npm run dev` after editing it, or a correct change can appear not to have applied.
+A change to `tailwind.config.js` does not reliably rebuild the dev server. Restart `npm run dev` after editing it, or a correct change can appear not to have applied.
 
 ## Browser baseline
 

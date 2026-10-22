@@ -48,7 +48,7 @@ export function TopBar({ search, priorityFilter, onSearchChange, onPriorityChang
           <span className="hidden font-mono text-[11px] uppercase tracking-[0.18em] text-faint lg:inline">Personal workspace</span>
         </div>
 
-        <div className="order-last w-full min-[520px]:order-none min-[520px]:w-60 lg:w-72">
+        <div className="order-last w-full min-[520px]:order-0 min-[520px]:w-60 lg:w-72">
           <div className="relative flex w-full items-center">
             <IconSearch size={15} stroke={1.5} aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />
             <Input

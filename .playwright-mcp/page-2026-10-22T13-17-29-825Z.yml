@@ -1,0 +1,232 @@
+- generic [ref=f1e3]:
+  - banner [ref=f1e4]:
+    - generic [ref=f1e5]:
+      - heading "Docket" [level=1] [ref=f1e11]
+      - textbox "Search cards by title or description" [ref=f1e14]:
+        - /placeholder: Search
+      - generic [ref=f1e15]:
+        - button "Filters" [ref=f1e17] [cursor=pointer]
+        - button "Undo" [disabled]
+        - button "Redo" [disabled]
+        - generic [ref=f1e24]:
+          - button "Export board" [ref=f1e25] [cursor=pointer]
+          - button "Import board" [ref=f1e29] [cursor=pointer]
+          - button "Board file" [ref=f1e33]
+  - main [ref=f1e34]:
+    - generic [ref=f1e36]:
+      - region "Backlog column" [ref=f1e37]:
+        - heading "Backlog" [level=2] [ref=f1e38]
+        - generic [ref=f1e39]:
+          - generic [ref=f1e40]:
+            - button "Rename Backlog column" [ref=f1e41] [cursor=pointer]:
+              - generic [ref=f1e42]: Backlog
+            - generic "2 of 2 cards" [ref=f1e43]: "2"
+          - generic [ref=f1e44]:
+            - button "Set Work In Progress limit for Backlog" [ref=f1e45] [cursor=pointer]
+            - button "Collapse Backlog column" [expanded] [ref=f1e51] [cursor=pointer]
+            - button "Move Backlog column left" [disabled]
+            - button "Move Backlog column right" [ref=f1e54] [cursor=pointer]
+            - button "Delete Backlog column" [ref=f1e58] [cursor=pointer]
+        - generic [ref=f1e62]:
+          - group "Research personal finance apps" [ref=f1e63]:
+            - generic [ref=f1e64]:
+              - checkbox "Select Research personal finance apps" [ref=f1e65] [cursor=pointer]
+              - generic [ref=f1e67]:
+                - generic [ref=f1e68]:
+                  - heading "Research personal finance apps" [level=3] [ref=f1e69]
+                  - generic [aria-hidden] [ref=f1e71]: ARCH
+                - generic [ref=f1e72]:
+                  - 'img "Priority: medium" [ref=f1e73]':
+                    - generic [aria-hidden] [ref=f1e78]: medium
+                  - generic "Filed 2026-10-14" [ref=f1e79]: 2026-10-14
+                  - generic "2026-10-29" [ref=f1e80]: +7D
+                - button "Show details" [ref=f1e81] [cursor=pointer]
+            - generic:
+              - button "Move Research personal finance apps up" [disabled]
+              - button "Move Research personal finance apps down"
+              - button "Move Research personal finance apps to the previous column" [disabled]
+              - button "Move Research personal finance apps to the next column"
+              - button "Edit Research personal finance apps"
+              - button "Delete Research personal finance apps"
+          - group "Set up photo backup" [ref=f1e84]:
+            - generic [ref=f1e85]:
+              - checkbox "Select Set up photo backup" [ref=f1e86] [cursor=pointer]
+              - generic [ref=f1e88]:
+                - generic [ref=f1e89]:
+                  - heading "Set up photo backup" [level=3] [ref=f1e90]
+                  - generic [aria-hidden] [ref=f1e92]: CKUP
+                - generic [ref=f1e93]:
+                  - 'img "Priority: medium" [ref=f1e94]':
+                    - generic [aria-hidden] [ref=f1e99]: medium
+                  - generic "Filed 2026-10-18" [ref=f1e100]: 2026-10-18
+                  - generic "2026-11-19" [ref=f1e101]: +28D
+                - button "Show details" [ref=f1e102] [cursor=pointer]
+            - generic:
+              - button "Move Set up photo backup up"
+              - button "Move Set up photo backup down" [disabled]
+              - button "Move Set up photo backup to the previous column" [disabled]
+              - button "Move Set up photo backup to the next column"
+              - button "Edit Set up photo backup"
+              - button "Delete Set up photo backup"
+        - button "File card" [ref=f1e105] [cursor=pointer]
+      - region "To Do column" [ref=f1e107]:
+        - heading "To Do" [level=2] [ref=f1e108]
+        - generic [ref=f1e109]:
+          - generic [ref=f1e110]:
+            - button "Rename To Do column" [ref=f1e111] [cursor=pointer]:
+              - generic [ref=f1e112]: To Do
+            - generic "3 of 3 cards" [ref=f1e113]: "3"
+          - generic [ref=f1e114]:
+            - button "Set Work In Progress limit for To Do" [ref=f1e115] [cursor=pointer]
+            - button "Collapse To Do column" [expanded] [ref=f1e121] [cursor=pointer]
+            - button "Move To Do column left" [ref=f1e124] [cursor=pointer]
+            - button "Move To Do column right" [ref=f1e128] [cursor=pointer]
+            - button "Delete To Do column" [ref=f1e132] [cursor=pointer]
+        - generic [ref=f1e136]:
+          - group "Plan weekly groceries" [ref=f1e137]:
+            - generic [ref=f1e138]:
+              - checkbox "Select Plan weekly groceries" [ref=f1e139] [cursor=pointer]
+              - generic [ref=f1e141]:
+                - generic [ref=f1e142]:
+                  - heading "Plan weekly groceries" [level=3] [ref=f1e143]
+                  - generic [aria-hidden] [ref=f1e145]: RIES
+                - generic [ref=f1e146]:
+                  - 'img "Priority: low" [ref=f1e147]':
+                    - generic [aria-hidden] [ref=f1e152]: low
+                  - generic "Filed 2026-10-15" [ref=f1e153]: 2026-10-15
+                  - generic "2026-11-01" [ref=f1e154]: +10D
+                - button "Show details" [ref=f1e155] [cursor=pointer]
+            - generic:
+              - button "Move Plan weekly groceries up" [disabled]
+              - button "Move Plan weekly groceries down"
+              - button "Move Plan weekly groceries to the previous column"
+              - button "Move Plan weekly groceries to the next column"
+              - button "Edit Plan weekly groceries"
+              - button "Delete Plan weekly groceries"
+          - group "Book dentist appointment" [ref=f1e158]:
+            - generic [ref=f1e159]:
+              - checkbox "Select Book dentist appointment" [ref=f1e160] [cursor=pointer]
+              - generic [ref=f1e162]:
+                - generic [ref=f1e163]:
+                  - heading "Book dentist appointment" [level=3] [ref=f1e164]
+                  - generic [aria-hidden] [ref=f1e166]: TIST
+                - generic [ref=f1e167]:
+                  - 'img "Priority: high" [ref=f1e168]':
+                    - generic [aria-hidden] [ref=f1e173]: high
+                  - generic "Filed 2026-10-17" [ref=f1e174]: 2026-10-17
+                  - generic "2026-11-05" [ref=f1e175]: +14D
+            - generic:
+              - button "Move Book dentist appointment up"
+              - button "Move Book dentist appointment down"
+              - button "Move Book dentist appointment to the previous column"
+              - button "Move Book dentist appointment to the next column"
+              - button "Edit Book dentist appointment"
+              - button "Delete Book dentist appointment"
+          - group "Organize reading list" [ref=f1e176]:
+            - generic [ref=f1e177]:
+              - checkbox "Select Organize reading list" [ref=f1e178] [cursor=pointer]
+              - generic [ref=f1e180]:
+                - generic [ref=f1e181]:
+                  - heading "Organize reading list" [level=3] [ref=f1e182]
+                  - generic [aria-hidden] [ref=f1e184]: OOKS
+                - generic [ref=f1e185]:
+                  - 'img "Priority: low" [ref=f1e186]':
+                    - generic [aria-hidden] [ref=f1e191]: low
+                  - generic "Filed 2026-10-19" [ref=f1e192]: 2026-10-19
+            - generic:
+              - button "Move Organize reading list up"
+              - button "Move Organize reading list down" [disabled]
+              - button "Move Organize reading list to the previous column"
+              - button "Move Organize reading list to the next column"
+              - button "Edit Organize reading list"
+              - button "Delete Organize reading list"
+        - button "File card" [ref=f1e193] [cursor=pointer]
+      - region "In Progress column" [ref=f1e195]:
+        - heading "In Progress" [level=2] [ref=f1e196]
+        - generic [ref=f1e197]:
+          - generic [ref=f1e198]:
+            - button "Rename In Progress column" [ref=f1e199] [cursor=pointer]:
+              - generic [ref=f1e200]: In Progress
+            - generic "2 of 2 cards" [ref=f1e201]: "2"
+          - generic [ref=f1e202]:
+            - button "Set Work In Progress limit for In Progress" [ref=f1e203] [cursor=pointer]
+            - button "Collapse In Progress column" [expanded] [ref=f1e209] [cursor=pointer]
+            - button "Move In Progress column left" [ref=f1e212] [cursor=pointer]
+            - button "Move In Progress column right" [ref=f1e216] [cursor=pointer]
+            - button "Delete In Progress column" [ref=f1e220] [cursor=pointer]
+        - generic [ref=f1e224]:
+          - group "Refresh portfolio case study" [ref=f1e225]:
+            - generic [ref=f1e226]:
+              - checkbox "Select Refresh portfolio case study" [ref=f1e227] [cursor=pointer]
+              - generic [ref=f1e229]:
+                - generic [ref=f1e230]:
+                  - heading "Refresh portfolio case study" [level=3] [ref=f1e231]
+                  - generic [aria-hidden] [ref=f1e233]: OLIO
+                - generic [ref=f1e234]:
+                  - 'img "Priority: high" [ref=f1e235]':
+                    - generic [aria-hidden] [ref=f1e240]: high
+                  - generic "Filed 2026-10-16" [ref=f1e241]: 2026-10-16
+                  - generic "2026-11-12" [ref=f1e242]: +21D
+                - button "Show details" [ref=f1e243] [cursor=pointer]
+            - generic:
+              - button "Move Refresh portfolio case study up" [disabled]
+              - button "Move Refresh portfolio case study down"
+              - button "Move Refresh portfolio case study to the previous column"
+              - button "Move Refresh portfolio case study to the next column"
+              - button "Edit Refresh portfolio case study"
+              - button "Delete Refresh portfolio case study"
+          - group "Prepare laundry schedule" [ref=f1e246]:
+            - generic [ref=f1e247]:
+              - checkbox "Select Prepare laundry schedule" [ref=f1e248] [cursor=pointer]
+              - generic [ref=f1e250]:
+                - generic [ref=f1e251]:
+                  - heading "Prepare laundry schedule" [level=3] [ref=f1e252]
+                  - generic [aria-hidden] [ref=f1e254]: NDRY
+                - generic [ref=f1e255]:
+                  - 'img "Priority: low" [ref=f1e256]':
+                    - generic [aria-hidden] [ref=f1e261]: low
+                  - generic "Filed 2026-10-20" [ref=f1e262]: 2026-10-20
+            - generic:
+              - button "Move Prepare laundry schedule up"
+              - button "Move Prepare laundry schedule down" [disabled]
+              - button "Move Prepare laundry schedule to the previous column"
+              - button "Move Prepare laundry schedule to the next column"
+              - button "Edit Prepare laundry schedule"
+              - button "Delete Prepare laundry schedule"
+        - button "File card" [ref=f1e263] [cursor=pointer]
+      - region "Done column" [ref=f1e265]:
+        - heading "Done" [level=2] [ref=f1e266]
+        - generic [ref=f1e267]:
+          - generic [ref=f1e268]:
+            - button "Rename Done column" [ref=f1e269] [cursor=pointer]:
+              - generic [ref=f1e270]: Done
+            - generic "1 of 1 cards" [ref=f1e271]: "1"
+          - generic [ref=f1e272]:
+            - button "Set Work In Progress limit for Done" [ref=f1e273] [cursor=pointer]
+            - button "Clear 1 finished card from Done" [ref=f1e279] [cursor=pointer]: Clear 1
+            - button "Collapse Done column" [expanded] [ref=f1e280] [cursor=pointer]
+            - button "Move Done column left" [ref=f1e283] [cursor=pointer]
+            - button "Move Done column right" [disabled]
+            - button "Delete Done column" [ref=f1e287] [cursor=pointer]
+        - group "Archive tax documents" [ref=f1e292]:
+          - generic [ref=f1e293]:
+            - checkbox "Select Archive tax documents" [ref=f1e294] [cursor=pointer]
+            - generic [ref=f1e296]:
+              - generic [ref=f1e297]:
+                - heading "Archive tax documents" [level=3] [ref=f1e298]
+                - generic [aria-hidden] [ref=f1e303]: DTAX
+              - generic [ref=f1e304]:
+                - 'img "Priority: medium" [ref=f1e305]':
+                  - generic [aria-hidden] [ref=f1e310]: medium
+                - generic "Filed 2026-10-21" [ref=f1e311]: 2026-10-21
+                - img "Done" [ref=f1e312]
+              - button "Show details" [ref=f1e313] [cursor=pointer]
+          - generic:
+            - button "Move Archive tax documents up" [disabled]
+            - button "Move Archive tax documents down" [disabled]
+            - button "Move Archive tax documents to the previous column"
+            - button "Move Archive tax documents to the next column" [disabled]
+            - button "Edit Archive tax documents"
+            - button "Delete Archive tax documents"
+        - button "File card" [ref=f1e316] [cursor=pointer]
+      - button "Add column" [ref=f1e318] [cursor=pointer]

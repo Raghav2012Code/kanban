@@ -56,7 +56,7 @@ export const CardForm = forwardRef<HTMLFormElement, CardFormProps>(function Card
   // second card being filed, so the two paths cannot be confused at a glance.
   const caption = editing ? 'Edit card' : 'File card';
   const submitLabel = editing ? 'Save changes' : 'Save card';
-  return <motion.form ref={ref} aria-label={caption} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={transition} onSubmit={submit} onKeyDown={(event: KeyboardEvent<HTMLFormElement>) => { if (event.key === 'Escape') onCancel(); }} className="space-y-2.5 overflow-hidden rounded-ui border border-line bg-surface p-3 shadow-sm">
+  return <motion.form ref={ref} aria-label={caption} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={transition} onSubmit={submit} onKeyDown={(event: KeyboardEvent<HTMLFormElement>) => { if (event.key === 'Escape') onCancel(); }} className="space-y-2.5 overflow-hidden rounded-ui border border-line bg-surface p-3 shadow-xs">
     <p className="font-mono text-[11px] uppercase leading-5 tracking-wide text-muted">{caption}</p>
     <div className="space-y-1"><label htmlFor={fieldId('title')} className="block font-mono text-[11px] uppercase tracking-wide text-muted">Card title</label><Input id={fieldId('title')} ref={titleRef} value={draft.title} onChange={(event) => update({ title: event.target.value })} aria-required="true" aria-invalid={Boolean(error && error.includes('title'))} aria-describedby={error && error.includes('title') ? errorId : undefined} aria-label="Card title" /></div>
     <div className="grid grid-cols-2 gap-2">

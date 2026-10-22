@@ -23,7 +23,7 @@ import type { MoveDirection } from './KanbanCard';
 const panel = 'flex w-full min-w-0 shrink-0 flex-col gap-2 lg:w-0 lg:min-w-[18rem] lg:flex-1';
 // The add-column form must reserve the same footprint as the collapsed trigger
 // (lg:w-44), or opening it steals width from every column and reflows the board.
-const addPanel = 'w-full min-w-0 shrink-0 rounded-ui border border-line bg-surface p-3 shadow-sm lg:w-44 lg:flex-none';
+const addPanel = 'w-full min-w-0 shrink-0 rounded-ui border border-line bg-surface p-3 shadow-xs lg:w-44 lg:flex-none';
 const emptyBay = 'px-0.5 py-4 text-xs leading-5 text-faint';
 
 interface BoardColumnProps {
@@ -110,7 +110,7 @@ export function BoardColumn({ column, cards, activeForm, renaming, renameValue, 
           full 28px target size rather than shrinking to fit. A long title
           truncates inside its button; the full name stays in the tooltip and the
           accessible name. */}
-      <div className="flex min-w-[6rem] flex-1 items-center gap-1">
+      <div className="flex min-w-24 flex-1 items-center gap-1">
         {renaming
           ? <Input ref={renameRef} value={renameValue} onChange={(event) => onRenameChange(event.target.value)} onBlur={() => onSaveRename(false)} onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => { if (event.key === 'Enter') onSaveRename(true); if (event.key === 'Escape') onCancelRename(); }} aria-label="Rename column" className="h-7 min-w-0 flex-1 px-2 py-0.5 text-sm" />
           : <Button variant="ghost" onClick={onBeginRename} className="h-7 min-w-0 flex-1 justify-start px-1 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink hover:bg-transparent hover:text-accent" title={`${column.title} — click or press Enter to rename`} aria-label={`Rename ${column.title} column`}><span className="truncate">{column.title}</span></Button>}
