@@ -106,7 +106,7 @@ export function KanbanCard({ card, done, overdue, expanded, dragging = false, dr
               : <span title={card.dueDate} className="font-mono text-[11px] tabular-nums text-muted">{formatDueDate(card.dueDate)}</span>)}
           </div>
           {card.description && <>
-            <Button variant="ghost" size="sm" onClick={() => onToggleExpanded(card.id)} aria-expanded={expanded} className="mt-1.5 h-auto px-0 py-0 font-mono text-[11px] uppercase tracking-wide text-muted hover:bg-transparent hover:text-ink">{expanded ? <IconChevronUp size={12} stroke={1.5} /> : <IconChevronDown size={12} stroke={1.5} />} {expanded ? 'Hide details' : 'Show details'}</Button>
+            <Button variant="ghost" size="sm" onClick={() => onToggleExpanded(card.id)} aria-expanded={expanded} className="mt-1.5 h-auto px-0 py-0 font-mono text-[11px] uppercase tracking-wide text-muted hover:bg-transparent hover:text-ink">{expanded ? <IconChevronUp size={12} stroke={1.5} /> : <IconChevronDown size={12} stroke={1.5} />} {expanded ? 'HIDE DETAILS' : 'SHOW DETAILS'}</Button>
             {expanded && <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} transition={transition} className="mt-1.5 overflow-hidden text-xs leading-5 text-muted">{card.description}</motion.p>}
           </>}
         </div>

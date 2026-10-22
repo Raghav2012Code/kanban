@@ -105,7 +105,8 @@ export function adjacentColumnOf(state: BoardState, cardId: string, direction: '
   return target === undefined ? undefined : state.columns[target];
 }
 
-export function moveCardWithinColumn(state: BoardState, cardId: string, direction: 'up' | 'down'): BoardState {  const column = state.columns.find((item) => item.cardIds.includes(cardId));
+export function moveCardWithinColumn(state: BoardState, cardId: string, direction: 'up' | 'down'): BoardState {
+  const column = state.columns.find((item) => item.cardIds.includes(cardId));
   if (!column) return state;
   const index = column.cardIds.indexOf(cardId);
   const targetIndex = direction === 'up' ? index - 1 : index + 1;
