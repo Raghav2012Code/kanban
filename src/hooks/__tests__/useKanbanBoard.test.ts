@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { HISTORY_LIMIT, useKanbanBoard } from '../useKanbanBoard';
 import { addCard, removeCard, updateCard } from '../../lib/board';
 import { STORAGE_KEY } from '../../lib/constants';
+import { createSeedState } from '../../lib/persistence';
 import type { CardDraft } from '../../types/kanban';
 
 const draft: CardDraft = { title: 'Renamed', priority: 'low', dueDate: '', description: '' };
@@ -26,6 +27,99 @@ describe('useKanbanBoard storage warnings', () => {
   it('does not warn when persistence succeeds', () => {
     const { result } = renderHook(() => useKanbanBoard());
     expect(result.current.storageWarning).toBeNull();
+  });
+});
+
+describe('useKanbanBoard storage warning recovery', () => {
+  const quotaError = (): Error => {
+    const error = new Error('full');
+    error.name = 'QuotaExceededError';
+    return error;
+  };
+
+  it('clears a write warning once writing succeeds again', async () => {
+    const original = Storage.prototype.setItem;
+    const quota = quotaError();
+    let full = true;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) {
+      if (full) throw quota;
+      original.call(this, key, value);
+    });
+    const { result } = renderHook(() => useKanbanBoard());
+    await waitFor(() => expect(result.current.storageWarning).toEqual({ kind: 'quota' }));
+
+    full = false;
+    act(() => result.current.mutate((board) => addCard(board, board.columns[0]!.id, { id: 'recovered', title: 'Recovered', priority: 'low', createdAt: 0 })));
+    await waitFor(() => expect(result.current.storageWarning).toBeNull());
+  });
+
+  it('warns again after a dismissed failure once a later write fails too', async () => {
+    const original = Storage.prototype.setItem;
+    const quota = quotaError();
+    let full = true;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) {
+      if (full) throw quota;
+      original.call(this, key, value);
+    });
+    const { result } = renderHook(() => useKanbanBoard());
+    await waitFor(() => expect(result.current.storageWarning).toEqual({ kind: 'quota' }));
+
+    act(() => result.current.dismissStorageWarning());
+    expect(result.current.storageWarning).toBeNull();
+
+    // A successful write proves the failure is over, so the dismissal is spent.
+    full = false;
+    act(() => result.current.mutate((board) => addCard(board, board.columns[0]!.id, { id: 'recovered', title: 'Recovered', priority: 'low', createdAt: 0 })));
+    await waitFor(() => expect(result.current.storageWarning).toBeNull());
+
+    // The next failure is a new fact and must not stay silenced.
+    full = true;
+    act(() => result.current.mutate((board) => addCard(board, board.columns[0]!.id, { id: 'failed-again', title: 'Failed again', priority: 'low', createdAt: 0 })));
+    await waitFor(() => expect(result.current.storageWarning).toEqual({ kind: 'quota' }));
+  });
+});
+
+describe('useKanbanBoard cross-tab adoption', () => {
+  const incomingBoard = (board: ReturnType<typeof useKanbanBoard>['board']) => ({
+    ...board,
+    cards: { ...board.cards, 'card-tax': { ...board.cards['card-tax']!, title: 'From the other tab' } },
+  });
+
+  it('adopts another tab board, clears history, and reports the update once', () => {
+    const { result } = renderHook(() => useKanbanBoard());
+    act(() => result.current.mutate((board) => addCard(board, board.columns[0]!.id, { id: 'mine', title: 'Mine', priority: 'low', createdAt: 0 })));
+    expect(result.current.canUndo).toBe(true);
+
+    const incoming = incomingBoard(result.current.board);
+    const newValue = JSON.stringify(incoming);
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY, newValue }));
+    });
+
+    expect(result.current.board.cards['card-tax']?.title).toBe('From the other tab');
+    // Undo belongs to this tab's work; it must not unmake another tab's.
+    expect(result.current.canUndo).toBe(false);
+    expect(result.current.externalUpdateCount).toBe(1);
+
+    // An echo of the value the tab just adopted is not a new update.
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY, newValue }));
+    });
+    expect(result.current.externalUpdateCount).toBe(1);
+  });
+
+  it('ignores an invalid or unrelated storage event', () => {
+    const { result } = renderHook(() => useKanbanBoard());
+    const before = result.current.board;
+
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY, newValue: '{not json' }));
+      window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY, newValue: JSON.stringify({ foo: 1 }) }));
+      window.dispatchEvent(new StorageEvent('storage', { key: 'something_else', newValue: JSON.stringify(createSeedState()) }));
+    });
+
+    expect(result.current.board).toBe(before);
+    expect(result.current.externalUpdateCount).toBe(0);
   });
 });
 

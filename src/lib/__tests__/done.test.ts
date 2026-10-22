@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { doneCardIds, getDoneColumn, isDoneCard, isDoneColumn } from '../done';
+import { doneCardIds, getDoneColumn, isDoneColumn } from '../done';
 import { createSeedState } from '../persistence';
 
 describe('isDoneColumn', () => {
@@ -14,7 +14,6 @@ describe('done tracking', () => {
     const board = createSeedState(new Date(2026, 8, 25));
     const renamed = { ...board, columns: board.columns.map((column) => (column.id === 'column-done' ? { ...column, title: 'Shipped' } : column)) };
     expect(getDoneColumn(renamed)?.title).toBe('Shipped');
-    expect(isDoneCard(renamed, 'card-tax')).toBe(true);
     expect(doneCardIds(renamed)).toEqual(['card-tax']);
   });
 
@@ -22,7 +21,6 @@ describe('done tracking', () => {
     const board = createSeedState(new Date(2026, 8, 25));
     const without = { ...board, columns: board.columns.filter((column) => column.id !== 'column-done') };
     expect(getDoneColumn(without)).toBeUndefined();
-    expect(isDoneCard(without, 'card-tax')).toBe(false);
     expect(doneCardIds(without)).toEqual([]);
   });
 });

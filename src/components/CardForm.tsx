@@ -21,6 +21,8 @@ interface CardFormProps {
   mode?: CardFormMode;
 }
 
+// AnimatePresence's popLayout mode measures its outgoing child through a ref,
+// so this stays a forwardRef even though no caller passes one.
 export const CardForm = forwardRef<HTMLFormElement, CardFormProps>(function CardForm({ onSave, onCancel, initialDraft, mode = 'file' }: CardFormProps, ref): JSX.Element {
   const [draft, setDraft] = useState<CardDraft>(() => initialDraft ?? emptyDraft);
   const [error, setError] = useState<string | null>(null);

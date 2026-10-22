@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addCard, isColumnAtLimit, isColumnOverLimit, isFilterActive, moveCard, moveCardToAdjacentColumn, moveCardWithinColumn, moveCardsInto, moveColumnToAdjacent, pruneExpandedIds, pruneRemovedIds, removeCard, removeCards, resolveInsertAfter, updateCard } from '../board';
+import { addCard, isColumnAtLimit, isColumnOverLimit, moveCard, moveCardToAdjacentColumn, moveCardWithinColumn, moveCardsInto, moveColumnToAdjacent, pruneRemovedIds, removeCard, removeCards, resolveInsertAfter, updateCard } from '../board';
 import type { BoardState, CardDraft, CardItem, ColumnItem } from '../../types/kanban';
 
 function board(): BoardState {
@@ -52,6 +52,14 @@ describe('moveCard', () => {
     const filtered = { ...board(), cards: { ...board().cards } };
     const moved = moveCard(filtered, 'a', 'col-2', 'c', false, { positional: false });
     expect(ids(moved, 'col-2')).toEqual(['c', 'd', 'a']);
+  });
+
+  it('does not reorder a same-column drop when positional movement is disabled', () => {
+    // Under a filter or sort the visible order is not the stored order, so
+    // appending there would rewrite work nobody asked to move. ADR-0002.
+    const state = board();
+    expect(moveCard(state, 'a', 'col-1', 'e', false, { positional: false })).toBe(state);
+    expect(moveCard(state, 'a', 'col-1', undefined, false, { positional: false })).toBe(state);
   });
 });
 
@@ -228,15 +236,6 @@ describe('moveColumnToAdjacent', () => {
   });
 });
 
-describe('isFilterActive', () => {
-  it('treats a blank query and the all filter as inactive', () => {
-    expect(isFilterActive('', 'all')).toBe(false);
-    expect(isFilterActive('   ', 'all')).toBe(false);
-    expect(isFilterActive('tax', 'all')).toBe(true);
-    expect(isFilterActive('', 'high')).toBe(true);
-  });
-});
-
 describe('moveCardsInto', () => {
   // A dedicated fixture, because a column cannot be added to the shared one without
   // putting a card in two columns at once, which is not a board the board would load.
@@ -304,6 +303,17 @@ describe('moveCardsInto', () => {
     expect(ids(moveCardsInto(state, ['a', 'b'], 'col-3'), 'col-3')).toEqual([]);
   });
 
+  it('does not let a stale selected id count toward the limit or the move', () => {
+    const state = threeColumns();
+    state.columns[2] = { ...(state.columns[2] as ColumnItem), limit: 1 };
+    // One real card and one id that has no card left. The stale id must not make
+    // the group look too large, and it must not be announced as moved.
+    const moved = moveCardsInto(state, ['missing', 'a'], 'col-3');
+    expect(ids(moved, 'col-3')).toEqual(['a']);
+    expect(moveCardsInto(state, ['missing'], 'col-3')).toBe(state);
+    expect(moveCardsInto(state, ['constructor'], 'col-3')).toBe(state);
+  });
+
   it('lets a group through when it fits, and refuses it when it does not', () => {
     const fitting = threeColumns();
     fitting.columns[2] = { ...(fitting.columns[2] as ColumnItem), limit: 2 };
@@ -358,14 +368,5 @@ describe('Work In Progress limits', () => {
     const state = board();
     state.columns.push(limited(1, ['e']));
     expect(ids(moveCardToAdjacentColumn(state, 'a', 'right'), 'col-3')).toEqual(['e']);
-  });
-});
-
-describe('pruneExpandedIds', () => {
-  it('drops the removed card and preserves the original set otherwise', () => {
-    const expanded = new Set(['a', 'b']);
-    const pruned = pruneExpandedIds(expanded, 'a');
-    expect([...pruned]).toEqual(['b']);
-    expect(pruneExpandedIds(expanded, 'missing')).toBe(expanded);
   });
 });

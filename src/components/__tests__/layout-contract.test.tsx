@@ -80,6 +80,7 @@ describe('the add-column footprint', () => {
     render(<KanbanBoard />);
 
     expect(hasClass(screen.getByLabelText('Backlog column'), 'lg:flex-1'), 'the columns are the flexible items in the row').toBe(true);
+    expect(hasClass(screen.getByLabelText('Backlog column'), 'lg:min-w-[18rem]'), 'a lane must keep a floor width for its header controls').toBe(true);
 
     await user.click(screen.getByRole('button', { name: /add column/i }));
     const panel = nearestReservedAncestor(screen.getByLabelText('New column name'));

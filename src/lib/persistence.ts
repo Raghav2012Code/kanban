@@ -44,7 +44,10 @@ export function isValidBoard(value: unknown): value is BoardState {
     if (item.limit !== undefined && (typeof item.limit !== 'number' || !Number.isInteger(item.limit) || item.limit < 0)) return false;
     columnIds.add(item.id);
     for (const cardId of item.cardIds) {
-      if (typeof cardId !== 'string' || !cards[cardId] || referencedCards.has(cardId)) return false;
+      // An own-property check, not a truthiness lookup: a reference such as
+      // "constructor" would otherwise resolve to Object.prototype's value and
+      // pass validation without a card ever existing.
+      if (typeof cardId !== 'string' || !Object.hasOwn(cards, cardId) || referencedCards.has(cardId)) return false;
       referencedCards.add(cardId);
     }
   }

@@ -1,6 +1,5 @@
 import { IconAdjustmentsHorizontal, IconCheck } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -21,14 +20,12 @@ const FILED_WINDOWS: Array<{ value: number | null; label: string }> = [
 ];
 
 /**
- * A native popover is used where the platform has one: the panel then lives in
- * the top layer, and Escape and an outside click close it without this component
- * listening for either. The position is set from script rather than CSS anchor
- * positioning so the panel behaves the same in every current browser.
+ * A native popover is used: the panel lives in the top layer, and Escape and an
+ * outside click close it without this component listening for either. The
+ * position is set from script rather than CSS anchor positioning so the panel
+ * behaves the same in every current browser.
  */
-const popoverSupported = typeof HTMLElement !== 'undefined' && 'showPopover' in HTMLElement.prototype;
-
-type PopoverPanel = HTMLElement & { showPopover?: () => void; hidePopover?: () => void };
+type PopoverPanel = HTMLElement & { showPopover: () => void; hidePopover: () => void };
 
 interface FilterPopoverProps {
   priority: PriorityFilter;
@@ -55,13 +52,13 @@ export function FilterPopover({ priority, onPriorityChange, dueWithinDays, onDue
 
   const close = () => {
     const panel = panelRef.current as PopoverPanel | null;
-    if (panel && typeof panel.hidePopover === 'function') panel.hidePopover();
+    if (panel) panel.hidePopover();
     setOpen(false);
   };
 
   useEffect(() => {
     const panel = panelRef.current;
-    if (!panel || !popoverSupported) return;
+    if (!panel) return;
     const onToggle = (event: Event) => {
       const nowOpen = (event as Event & { newState?: string }).newState === 'open';
       setOpen(nowOpen);
@@ -74,7 +71,7 @@ export function FilterPopover({ priority, onPriorityChange, dueWithinDays, onDue
   }, []);
 
   useEffect(() => {
-    if (!open || !popoverSupported) return;
+    if (!open) return;
     window.addEventListener('resize', close);
     return () => window.removeEventListener('resize', close);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,18 +85,18 @@ export function FilterPopover({ priority, onPriorityChange, dueWithinDays, onDue
       close();
       return;
     }
-    if (typeof panel.showPopover === 'function') {
-      const rect = button.getBoundingClientRect();
-      const width = panel.offsetWidth || 288;
-      const left = Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12));
-      panel.style.left = `${left}px`;
-      panel.style.top = `${rect.bottom + 8}px`;
-      panel.showPopover();
-      setOpen(true);
-      return;
-    }
-    // Environments without the popover API (including the test suite) simply
-    // show and hide the panel in place.
+    const rect = button.getBoundingClientRect();
+    const width = panel.offsetWidth || 288;
+    const left = Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12));
+    const top = rect.bottom + 8;
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+    // The panel is taller than a short viewport. Clamping it and letting it
+    // scroll keeps its last control reachable instead of clipping it below the
+    // fold with no way to scroll to it.
+    panel.style.maxHeight = `${Math.max(160, window.innerHeight - top - 12)}px`;
+    panel.style.overflowY = 'auto';
+    panel.showPopover();
     setOpen(true);
   };
 
@@ -116,11 +113,9 @@ export function FilterPopover({ priority, onPriorityChange, dueWithinDays, onDue
       <div
         id="filters-panel"
         ref={panelRef}
-        {...(popoverSupported ? { popover: 'auto' } : {})}
-        hidden={popoverSupported ? undefined : !open}
-        onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => { if (!popoverSupported && event.key === 'Escape') close(); }}
+        {...{ popover: 'auto' }}
         aria-label="Filters"
-        className={cn('popover-panel z-30 w-72 rounded-ui border border-line bg-surface p-3 shadow-lg', !popoverSupported && 'absolute right-0 top-full mt-2')}
+        className="popover-panel z-30 w-72 rounded-ui border border-line bg-surface p-3 shadow-lg"
       >
         <div className="flex flex-col gap-3">
           <div className="space-y-1">
