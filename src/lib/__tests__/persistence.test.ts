@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { computeAnalytics } from '../analytics';
 import { CORRUPT_STORAGE_KEY, LEGACY_STORAGE_KEY, STORAGE_KEY } from '../constants';
 import { createSeedState, isValidBoard, loadBoardState, persistBoardState } from '../persistence';
+import { orderCardIds } from '../rank';
 import type { BoardState } from '../../types/kanban';
 
 function memoryStorage(initial: Record<string, string> = {}): Storage {
@@ -79,13 +80,25 @@ describe('loadBoardState', () => {
     expect(isValidBoard(result.board)).toBe(true);
   });
 
-  it('loads an existing valid board unchanged', () => {
+  it('loads a board saved before ranks existed without rewriting it, and keeps its order', () => {
     const seed = createSeedState(new Date(2026, 8, 25));
     const storage = memoryStorage();
     storage.setItem(STORAGE_KEY, JSON.stringify(seed));
     const result = loadBoardState(storage);
     expect(result.status).toBe('loaded');
     expect(result.board).toEqual(seed);
+    for (const column of result.board.columns) {
+      expect(orderCardIds(result.board, column)).toEqual(column.cardIds);
+    }
+  });
+
+  it('loads a board that already carries ranks unchanged', () => {
+    const board = createSeedState(new Date(2026, 8, 25));
+    const card = board.cards['card-tax'];
+    if (!card) throw new Error('seed has no card');
+    card.rank = 'V';
+    const result = loadBoardState(memoryStorage({ [STORAGE_KEY]: JSON.stringify(board) }));
+    expect(result.board).toEqual(board);
   });
 
   it('loads a board carrying Work In Progress limits', () => {
@@ -110,6 +123,16 @@ describe('loadBoardState', () => {
     const result = loadBoardState(memoryStorage({ [LEGACY_STORAGE_KEY]: JSON.stringify(seed) }));
     expect(result.status).toBe('loaded');
     expect(result.board).toEqual(seed);
+  });
+
+  it('rejects a rank outside the documented alphabet rather than sorting it unpredictably', () => {
+    for (const rank of ['', 'has space', 'O!', 7, null]) {
+      const board = createSeedState();
+      const card = board.cards['card-tax'];
+      if (!card) throw new Error('seed has no card');
+      (card as unknown as { rank: unknown }).rank = rank;
+      expect(isValidBoard(JSON.parse(JSON.stringify(board))), `rank ${JSON.stringify(rank)}`).toBe(false);
+    }
   });
 
   it('prefers the current key when a board exists under both names', () => {

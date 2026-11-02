@@ -4,6 +4,9 @@ import type { BoardState, CardItem } from '../types/kanban';
 
 const DAY_MS = 86_400_000;
 
+/** A rank is the documented alphabet only, so every device compares it the same way. */
+const RANK_PATTERN = /^[0-9A-Za-z]+$/;
+
 export function createSeedState(today = new Date()): BoardState {
   const base = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
   const due = (days: number): string => localDateString(addDays(new Date(base), days));
@@ -53,8 +56,8 @@ export function isValidBoard(value: unknown): value is BoardState {
   }
   for (const [id, card] of Object.entries(cards)) {
     if (!card || typeof card !== 'object') return false;
-    const item = card as { id?: unknown; title?: unknown; priority?: unknown; dueDate?: unknown; description?: unknown; createdAt?: unknown };
-    if (item.id !== id || typeof item.title !== 'string' || !item.title.trim() || !PRIORITIES.includes(item.priority as typeof PRIORITIES[number]) || typeof item.createdAt !== 'number' || !Number.isFinite(item.createdAt) || (item.description !== undefined && typeof item.description !== 'string') || (item.dueDate !== undefined && !isValidDateString(item.dueDate)) || !referencedCards.has(id)) return false;
+    const item = card as { id?: unknown; title?: unknown; priority?: unknown; dueDate?: unknown; description?: unknown; createdAt?: unknown; rank?: unknown };
+    if (item.id !== id || typeof item.title !== 'string' || !item.title.trim() || !PRIORITIES.includes(item.priority as typeof PRIORITIES[number]) || typeof item.createdAt !== 'number' || !Number.isFinite(item.createdAt) || (item.description !== undefined && typeof item.description !== 'string') || (item.dueDate !== undefined && !isValidDateString(item.dueDate)) || (item.rank !== undefined && (typeof item.rank !== 'string' || !RANK_PATTERN.test(item.rank))) || !referencedCards.has(id)) return false;
   }
   return true;
 }

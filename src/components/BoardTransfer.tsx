@@ -3,6 +3,7 @@ import { IconDownload, IconUpload } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { downloadBoard, readBoardFile } from '@/lib/export';
 import { isValidBoard } from '@/lib/persistence';
+import { normalizeBoard } from '@/lib/rank';
 import type { BoardState } from '@/types/kanban';
 
 export type TransferResult = 'replaced' | 'invalid' | 'unreadable';
@@ -58,7 +59,7 @@ export function BoardTransfer({ board, onReplace, onResult }: BoardTransferProps
         return;
       }
       // Ask before replacing: importing must never quietly destroy today's work.
-      setPending(parsed);
+      setPending(normalizeBoard(parsed));
     } catch {
       setPending(null);
       onResult('unreadable');
