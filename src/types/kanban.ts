@@ -8,6 +8,8 @@ export interface CardItem {
   dueDate?: string;
   /** When the card was filed. Written on every card and, before this work, never read. */
   createdAt: number;
+  /** Position in its column as a text rank (ADR-0004). Absent on boards saved before ranks. */
+  rank?: string;
 }
 
 export interface ColumnItem {
