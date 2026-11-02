@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addCard, isColumnAtLimit, isColumnOverLimit, moveCard, moveCardToAdjacentColumn, moveCardWithinColumn, moveCardsInto, moveColumnToAdjacent, pruneRemovedIds, removeCard, removeCards, resolveInsertAfter, updateCard } from '../board';
-import { orderCardIds } from '../rank';
+import { orderCardIds, normalizeBoard } from '../rank';
 import type { BoardState, CardDraft, CardItem, ColumnItem } from '../../types/kanban';
 
 function board(): BoardState {
@@ -204,6 +204,12 @@ describe('updateCard', () => {
     expect(updateCard(state, 'missing', draft())).toBe(state);
   });
 
+  it('preserves the rank, so correcting a card cannot move it', () => {
+    const state = board();
+    state.cards.b = { ...state.cards.b!, rank: 'V' };
+    expect(updateCard(state, 'b', draft()).cards.b?.rank).toBe('V');
+  });
+
   it('cannot introduce a duplicate card, because the id is not the draft to set', () => {
     // The add path guards a duplicate by rejecting a card whose id already exists.
     // Update has no such hazard by construction: the target id is chosen by the
@@ -373,5 +379,67 @@ describe('Work In Progress limits', () => {
     const state = board();
     state.columns.push(limited(1, ['e']));
     expect(ids(moveCardToAdjacentColumn(state, 'a', 'right'), 'col-3')).toEqual(['e']);
+  });
+});
+
+describe('card order on a shared board (ADR-0004)', () => {
+  it('keeps both of two moves into one column and computes one order from them', () => {
+    // The board is ranked once, as the first mutation leaves it, then two devices
+    // start from that same board. One puts 'a' before 'c'; the other puts 'e' after
+    // 'd'. Each move writes exactly one card's rank and no list.
+    const base = normalizeBoard(board());
+    const first = moveCard(base, 'a', 'col-2', 'c', false);
+    const second = moveCard(base, 'e', 'col-2', 'd', true);
+
+    expect(first.cards.a?.rank).toBeDefined();
+    expect(first.cards.e?.rank).toBe(base.cards.e?.rank);
+    expect(second.cards.e?.rank).toBeDefined();
+    expect(second.cards.a?.rank).toBe(base.cards.a?.rank);
+
+    // The store merges both rank writes onto the starting board. Membership order is
+    // deliberately scrambled, because it is membership, not order.
+    const merged: BoardState = {
+      ...base,
+      cards: { ...base.cards, a: first.cards.a as CardItem, e: second.cards.e as CardItem },
+      columns: [
+        { ...(base.columns[0] as ColumnItem), cardIds: ['b'] },
+        { ...(base.columns[1] as ColumnItem), cardIds: ['d', 'e', 'c', 'a'] },
+      ],
+    };
+
+    expect(ids(merged, 'col-2')).toEqual(['a', 'c', 'd', 'e']);
+    // Every device derives the same order from the same ranks.
+    const renumbered = {
+      ...merged,
+      columns: [merged.columns[0] as ColumnItem, { ...(merged.columns[1] as ColumnItem), cardIds: ['c', 'a', 'e', 'd'] }],
+    };
+    expect(ids(renumbered, 'col-2')).toEqual(ids(merged, 'col-2'));
+  });
+
+  it('moves one card without disturbing the relative order of the others', () => {
+    const state = board();
+    const before = ids(state, 'col-1').filter((id) => id !== 'a');
+    const moved = moveCard(state, 'a', 'col-1', 'e', false);
+    expect(ids(moved, 'col-1').filter((id) => id !== 'a')).toEqual(before);
+  });
+
+  it('settles two cards on the same rank in one order, on every read and reload', () => {
+    const state = board();
+    state.cards.a = { ...(state.cards.a as CardItem), rank: 'V' };
+    state.cards.b = { ...(state.cards.b as CardItem), rank: 'V' };
+    state.cards.e = { ...(state.cards.e as CardItem), rank: 'W' };
+    state.columns[0] = { ...(state.columns[0] as ColumnItem), cardIds: ['e', 'b', 'a'] };
+
+    // Identity breaks the tie, so 'a' precedes 'b' whatever order they arrived in.
+    expect(ids(state, 'col-1')).toEqual(['a', 'b', 'e']);
+    expect(ids(state, 'col-1')).toEqual(['a', 'b', 'e']);
+    expect(ids(JSON.parse(JSON.stringify(state)) as BoardState, 'col-1')).toEqual(['a', 'b', 'e']);
+  });
+
+  it('reads an unchanged board identically across repeated reads and a reload', () => {
+    const ranked = moveCard(board(), 'b', 'col-1', 'e', true);
+    const before = ids(ranked, 'col-1');
+    for (let index = 0; index < 5; index += 1) expect(ids(ranked, 'col-1')).toEqual(before);
+    expect(ids(JSON.parse(JSON.stringify(ranked)) as BoardState, 'col-1')).toEqual(before);
   });
 });
