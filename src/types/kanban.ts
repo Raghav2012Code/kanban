@@ -15,6 +15,7 @@ export interface CardItem {
 export interface ColumnItem {
   id: string;
   title: string;
+  /** Membership only. Card order is the rank on each card (ADR-0004). */
   cardIds: string[];
   /** Optional. Absent means unrestricted, so the field is purely additive. */
   limit?: number;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addCard, isColumnAtLimit, isColumnOverLimit, moveCard, moveCardToAdjacentColumn, moveCardWithinColumn, moveCardsInto, moveColumnToAdjacent, pruneRemovedIds, removeCard, removeCards, resolveInsertAfter, updateCard } from '../board';
+import { orderCardIds } from '../rank';
 import type { BoardState, CardDraft, CardItem, ColumnItem } from '../../types/kanban';
 
 function board(): BoardState {
@@ -18,7 +19,10 @@ function board(): BoardState {
   };
 }
 
-const ids = (state: BoardState, columnId: string): string[] => state.columns.find((column) => column.id === columnId)?.cardIds ?? [];
+const ids = (state: BoardState, columnId: string): string[] => {
+  const column = state.columns.find((item) => item.id === columnId);
+  return column ? orderCardIds(state, column) : [];
+};
 
 describe('resolveInsertAfter', () => {
   it('splits the target at its vertical midpoint', () => {
@@ -140,7 +144,8 @@ describe('addCard', () => {
 
   it('adds the card to the requested column', () => {
     const added = addCard(board(), 'col-2', card);
-    expect(added.cards.f).toEqual(card);
+    expect(added.cards.f).toMatchObject(card);
+    expect(added.cards.f?.rank).toEqual(expect.any(String));
     expect(ids(added, 'col-2')).toEqual(['c', 'd', 'f']);
   });
 

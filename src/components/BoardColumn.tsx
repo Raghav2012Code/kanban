@@ -134,9 +134,11 @@ export function BoardColumn({ column, cards, activeForm, renaming, renameValue, 
         otherwise wins over the user agent's `[hidden]` rule, leaving a collapsed
         column's cards visible. Only one display class is emitted at a time. */}
     <div id={bodyId} hidden={collapsed} className={collapsed ? 'hidden' : 'flex flex-col gap-2'}><AnimatePresence initial={false}>{showColumnDropIndicator && <motion.div key="column-drop" initial={{ opacity: 0, scaleY: 0.8 }} animate={{ opacity: 1, scaleY: 1 }} exit={{ opacity: 0, scaleY: 0.8 }} transition={transition} className={dropPlaceholderClass} aria-hidden="true" />}{cards.map((card) => {
-      const index = column.cardIds.indexOf(card.id);
+      // The rendered order is the ranked order, so the neighbour a move would swap
+      // with is read from what is on screen rather than from membership.
+      const index = cards.findIndex((item) => item.id === card.id);
       const canMoveUp = positionalEnabled && index > 0;
-      const canMoveDown = positionalEnabled && index >= 0 && index < total - 1;
+      const canMoveDown = positionalEnabled && index >= 0 && index < cards.length - 1;
       const dropBefore = positionalEnabled && Boolean(draggedCardId && dropTarget?.columnId === column.id && dropTarget.cardId === card.id && !dropTarget.insertAfter);
       const dropAfter = positionalEnabled && dropTarget?.columnId === column.id && dropTarget.cardId === card.id && dropTarget.insertAfter;
       return <Fragment key={card.id}>{editingCardId === card.id

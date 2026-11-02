@@ -18,6 +18,7 @@ import { getDoneColumn } from './lib/done';
 import { isViewActive, visibleByColumn as computeVisibleByColumn } from './lib/filter';
 import type { FilterCriteria } from './lib/filter';
 import { sortCardIds } from './lib/sort';
+import { orderCardIds } from './lib/rank';
 import { makeId } from './lib/ids';
 import { normalizeCardDraft } from './lib/validation';
 import { loadCollapsedIds, saveCollapsedIds } from './lib/layout-prefs';
@@ -391,9 +392,10 @@ export default function KanbanBoard(): JSX.Element {
     if (!card) return null;
     const landed = to.columns.find((column) => column.cardIds.includes(cardId));
     if (!landed) return null;
-    const position = landed.cardIds.indexOf(cardId) + 1;
+    const order = orderCardIds(to, landed);
+    const position = order.indexOf(cardId) + 1;
     const where = direction === 'up' ? 'up' : direction === 'down' ? 'down' : `to ${landed.title}`;
-    return `Moved ${card.title} ${where}, position ${position} of ${landed.cardIds.length}.`;
+    return `Moved ${card.title} ${where}, position ${position} of ${order.length}.`;
   };
 
   const moveCardTo = (cardId: string, direction: MoveDirection) => {
@@ -575,7 +577,8 @@ export default function KanbanBoard(): JSX.Element {
       }
       const landed = moved.columns.find((column) => column.cardIds.includes(id));
       const card = board.cards[id];
-      announce(landed && card ? `Moved ${card.title} to ${landed.title}, position ${landed.cardIds.indexOf(id) + 1} of ${landed.cardIds.length}.` : null);
+      const order = landed ? orderCardIds(moved, landed) : [];
+      announce(landed && card ? `Moved ${card.title} to ${landed.title}, position ${order.indexOf(id) + 1} of ${order.length}.` : null);
       updateBoard(() => moved);
     }
     clearDrag();

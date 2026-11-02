@@ -1,5 +1,6 @@
 import { DONE_COLUMN_ID } from './constants';
 import { dayNumber, isCardOverdue, isValidDateString, localDateString } from './dates';
+import { orderCardIds } from './rank';
 // A card's fields. The board, column, and sort types live in ../types/kanban,
 // which has no dependency on this module.
 import type { BoardState, CardItem, ColumnItem, PriorityFilter, SortMode } from '../types/kanban';
@@ -88,7 +89,7 @@ export function visibleCardIds(column: ColumnItem, board: BoardState, criteria: 
   // once here rather than inside the per-card predicate.
   if (criteria.columnTitle.trim() && !matchesColumnTitle(column, criteria.columnTitle)) return [];
   const done = column.id === DONE_COLUMN_ID;
-  return column.cardIds.filter((id) => {
+  return orderCardIds(board, column).filter((id) => {
     const card = board.cards[id];
     return Boolean(card && isVisibleCard(card, criteria, { done, today }));
   });

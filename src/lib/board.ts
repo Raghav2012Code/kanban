@@ -1,3 +1,4 @@
+import { normalizeBoard, orderCardIds, rankBetween } from './rank';
 import type { BoardState, CardDraft, CardItem, ColumnItem } from '../types/kanban';
 
 export interface MoveCardOptions {
@@ -25,9 +26,29 @@ export function isColumnOverLimit(column: ColumnItem, visibleCount: number = col
   return column.limit !== undefined && visibleCount > column.limit;
 }
 
+/**
+ * The rank a card needs to land at `anchorId` (or at the end when there is no
+ * anchor), computed from the ordered neighbours around the slot. The moving card
+ * is excluded first, or it would become its own neighbour.
+ */
+function rankForSlot(state: BoardState, column: ColumnItem, cardId: string, anchorId: string | undefined, insertAfter: boolean, positional: boolean): string {
+  const order = orderCardIds(state, column).filter((id) => id !== cardId);
+  let slot = order.length;
+  if (positional && anchorId) {
+    const anchorIndex = order.indexOf(anchorId);
+    slot = anchorIndex < 0 ? order.length : anchorIndex + (insertAfter ? 1 : 0);
+  }
+  const lower = slot > 0 ? state.cards[order[slot - 1] as string]?.rank : undefined;
+  const upper = order[slot] === undefined ? undefined : state.cards[order[slot] as string]?.rank;
+  return rankBetween(lower, upper);
+}
+
 export function moveCard(state: BoardState, cardId: string, targetColumnId: string, targetCardId?: string, insertAfter = false, options: MoveCardOptions = {}): BoardState {
-  const sourceColumn = state.columns.find((column) => column.cardIds.includes(cardId));
-  const targetColumn = state.columns.find((column) => column.id === targetColumnId);
+  // A board may arrive unranked (saved before ranks, or built by a caller that has
+  // not loaded it), so rank it before a move asks for neighbours.
+  const current = normalizeBoard(state);
+  const sourceColumn = current.columns.find((column) => column.cardIds.includes(cardId));
+  const targetColumn = current.columns.find((column) => column.id === targetColumnId);
   if (!sourceColumn || !targetColumn) return state;
 
   // A Work In Progress limit is enforced here rather than in the component, so no
@@ -46,18 +67,18 @@ export function moveCard(state: BoardState, cardId: string, targetColumnId: stri
   const anchorId = positional ? targetCardId : undefined;
   if (anchorId === cardId) return state;
 
-  const sourceIds = sourceColumn.cardIds.filter((id) => id !== cardId);
-  const targetIds = sourceColumn.id === targetColumn.id ? sourceIds.slice() : targetColumn.cardIds.filter((id) => id !== cardId);
-  const targetIndex = anchorId ? targetIds.indexOf(anchorId) : -1;
-  const insertAt = targetIndex < 0 ? targetIds.length : targetIndex + (insertAfter ? 1 : 0);
-  targetIds.splice(insertAt, 0, cardId);
+  const rank = rankForSlot(current, targetColumn, cardId, anchorId, insertAfter, positional);
+  const cards = { ...current.cards, [cardId]: { ...current.cards[cardId]!, rank } };
+  // Membership only: the rank now says where the card sits, so a same-column move
+  // rewrites one rank and leaves every list untouched.
+  if (sourceColumn.id === targetColumn.id) return { ...current, cards };
 
   return {
-    ...state,
-    columns: state.columns.map((column) => {
-      if (column.id === sourceColumn.id && column.id === targetColumn.id) return { ...column, cardIds: targetIds };
-      if (column.id === sourceColumn.id) return { ...column, cardIds: sourceIds };
-      if (column.id === targetColumn.id) return { ...column, cardIds: targetIds };
+    ...current,
+    cards,
+    columns: current.columns.map((column) => {
+      if (column.id === sourceColumn.id) return { ...column, cardIds: column.cardIds.filter((id) => id !== cardId) };
+      if (column.id === targetColumn.id) return { ...column, cardIds: [...column.cardIds.filter((id) => id !== cardId), cardId] };
       return column;
     }),
   };
@@ -106,12 +127,14 @@ export function adjacentColumnOf(state: BoardState, cardId: string, direction: '
 }
 
 export function moveCardWithinColumn(state: BoardState, cardId: string, direction: 'up' | 'down'): BoardState {
-  const column = state.columns.find((item) => item.cardIds.includes(cardId));
+  const current = normalizeBoard(state);
+  const column = current.columns.find((item) => item.cardIds.includes(cardId));
   if (!column) return state;
-  const index = column.cardIds.indexOf(cardId);
+  const order = orderCardIds(current, column);
+  const index = order.indexOf(cardId);
   const targetIndex = direction === 'up' ? index - 1 : index + 1;
-  if (targetIndex < 0 || targetIndex >= column.cardIds.length) return state;
-  return moveCard(state, cardId, column.id, column.cardIds[targetIndex], direction === 'down');
+  if (index < 0 || targetIndex < 0 || targetIndex >= order.length) return state;
+  return moveCard(current, cardId, column.id, order[targetIndex], direction === 'down');
 }
 
 export function moveCardToAdjacentColumn(state: BoardState, cardId: string, direction: 'left' | 'right'): BoardState {
@@ -146,8 +169,17 @@ export function removeCards(state: BoardState, cardIds: string[]): BoardState {
 }
 
 export function addCard(state: BoardState, columnId: string, card: CardItem): BoardState {
-  if (state.cards[card.id] || !state.columns.some((column) => column.id === columnId)) return state;
-  return { cards: { ...state.cards, [card.id]: card }, columns: state.columns.map((column) => (column.id === columnId ? { ...column, cardIds: [...column.cardIds, card.id] } : column)) };
+  const current = normalizeBoard(state);
+  const column = current.columns.find((item) => item.id === columnId);
+  if (!column || current.cards[card.id]) return state;
+  const order = orderCardIds(current, column);
+  const last = order[order.length - 1];
+  const rank = rankBetween(last === undefined ? undefined : current.cards[last]?.rank, undefined);
+  return {
+    ...current,
+    cards: { ...current.cards, [card.id]: { ...card, rank } },
+    columns: current.columns.map((item) => (item.id === columnId ? { ...item, cardIds: [...item.cardIds, card.id] } : item)),
+  };
 }
 
 /**
@@ -164,6 +196,7 @@ export function updateCard(state: BoardState, cardId: string, draft: CardDraft):
     title: draft.title,
     priority: draft.priority,
     createdAt: existing.createdAt,
+    ...(existing.rank === undefined ? {} : { rank: existing.rank }),
     ...(draft.description ? { description: draft.description } : {}),
     ...(draft.dueDate ? { dueDate: draft.dueDate } : {}),
   };

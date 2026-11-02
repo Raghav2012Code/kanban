@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import KanbanBoard from '../../KanbanBoard';
 import { COLLAPSED_COLUMNS_KEY, STORAGE_KEY } from '../../lib/constants';
 import { createSeedState } from '../../lib/persistence';
+import { orderCardIds } from '../../lib/rank';
 import { addDays, formatFiledDate, localDateString } from '../../lib/dates';
 
 beforeEach(() => {
@@ -740,8 +741,9 @@ describe('KanbanBoard filtering and sorting', () => {
     expect(cardNamesIn('To Do column')[0]).toBe('Book dentist appointment');
     // ...but nothing was written: the same cards are still there, in the old order.
     const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}');
-    const stored = saved.columns?.find((column: { id: string }) => column.id === 'column-todo')?.cardIds;
-    expect(stored?.map((id: string) => saved.cards[id].title)).toEqual(before);
+    const column = saved.columns?.find((item: { id: string }) => item.id === 'column-todo');
+    const stored = column ? orderCardIds(saved, column).map((id: string) => saved.cards[id].title) : [];
+    expect(stored).toEqual(before);
   });
 
   it('returns to manual order', async () => {
